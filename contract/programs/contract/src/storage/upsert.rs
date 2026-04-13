@@ -1,22 +1,21 @@
 use crate::{
-    constants::{MAX_KEY_LEN, MAX_LEVEL, MAX_VALUE_LEN},
+    constants::{MAX_KEY_LEN, MAX_LEVEL, MAX_VALUE_LEN, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
     error::Error,
-    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
-    storage::utils::calc_level,
+    storage::{storage_structs::{SkipListMeta, SkipNode, ValueAccount}, utils::calc_level},
 };
 use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
 #[instruction(key: Vec<u8>)]
 pub struct Upsert<'info> {
-    #[account(mut, seeds=[b"meta"], bump)]
+    #[account(mut, seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
 
     #[account(
         init,
         payer = signer,
         space = SkipNode::LEN,
-        seeds=[b"node", key.as_slice()],
+        seeds=[NODE_SEEDS, key.as_slice()],
         bump
     )]
     pub new_node: Account<'info, SkipNode>,
@@ -25,7 +24,7 @@ pub struct Upsert<'info> {
         init,
         payer = signer,
         space = ValueAccount::LEN,
-        seeds=[b"value", key.as_slice()],
+        seeds=[VALUE_SEEDS, key.as_slice()],
         bump
     )]
     pub value_account: Account<'info, ValueAccount>,

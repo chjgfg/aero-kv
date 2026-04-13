@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount};
+use crate::{constants::META_SEEDS, storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount}};
 
 #[event]
 pub struct KVPair {
@@ -9,7 +9,7 @@ pub struct KVPair {
 }
 #[derive(Accounts)]
 pub struct Scan<'info> {
-    #[account(seeds=[b"meta"], bump)]
+    #[account(seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
 }
 

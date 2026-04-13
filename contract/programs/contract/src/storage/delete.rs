@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::MAX_LEVEL,
+    constants::{MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
     error::Error,
     storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
 };
@@ -12,19 +12,19 @@ pub struct Delete<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
-    #[account(seeds=[b"meta"], bump)]
+    #[account(seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
 
     #[account(
         mut,
-        seeds=[b"node", key.as_slice()],
+        seeds=[NODE_SEEDS, key.as_slice()],
         bump
     )]
     pub target: Account<'info, SkipNode>,
 
     #[account(
         mut,
-        seeds=[b"value", key.as_slice()],
+        seeds=[VALUE_SEEDS, key.as_slice()],
         bump
     )]
     pub value_account: Account<'info, ValueAccount>,

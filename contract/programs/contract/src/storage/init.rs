@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::MAX_LEVEL, storage::storage_structs::{SkipListMeta, SkipNode}};
+use crate::{constants::{HEAD_SEEDS, MAX_LEVEL, META_SEEDS}, storage::storage_structs::{SkipListMeta, SkipNode}};
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -8,7 +8,7 @@ pub struct Initialize<'info> {
         init, 
         payer = signer, 
         space = SkipListMeta::LEN, 
-        seeds=[b"meta"], 
+        seeds=[META_SEEDS], 
         bump
     )]
     pub meta: Account<'info, SkipListMeta>,
@@ -17,7 +17,7 @@ pub struct Initialize<'info> {
         init, 
         payer = signer, 
         space = SkipNode::LEN, 
-        seeds=[b"head"], 
+        seeds=[HEAD_SEEDS], 
         bump
     )]
     pub head: Account<'info, SkipNode>,

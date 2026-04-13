@@ -1,20 +1,18 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
-    error::Error,
-    storage::utils::key_cmp,
+    constants::{HEAD_SEEDS, META_SEEDS, NODE_SEEDS}, error::Error, storage::{storage_structs::{SkipListMeta, SkipNode, ValueAccount}, utils::key_cmp}
 };
 
 #[derive(Accounts)]
 pub struct Get<'info> {
-    #[account(seeds=[b"meta"], bump)]
+    #[account(seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
 
-    #[account(seeds=[b"head"], bump)]
+    #[account(seeds=[HEAD_SEEDS], bump)]
     pub head: Account<'info, SkipNode>,
 
-    #[account(seeds=[b"node", target.key.as_slice()], bump)]
+    #[account(seeds=[NODE_SEEDS, target.key.as_slice()], bump)]
     pub target: Account<'info, SkipNode>,
 
     pub value_account: Account<'info, ValueAccount>,

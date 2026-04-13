@@ -1,68 +1,93 @@
-use anchor_lang::prelude::{program::invoke, *};
-use crate::constants::{KVData, StorageMode, PDA_LEN, KV_ACCOUNT_SEED, TREASURY_SEED};
+use crate::{
+    constants::{MAX_KEY_LEN, MAX_LEVEL, MAX_VALUE_LEN},
+    error::Error,
+    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+    storage::utils::calc_level,
+};
+use anchor_lang::prelude::*;
 
 #[derive(Accounts)]
-#[instruction(id: String, value:Vec<u8>)]
-pub struct UpsertKV<'info> {
+#[instruction(key: Vec<u8>)]
+pub struct Upsert<'info> {
+    #[account(mut, seeds=[b"meta"], bump)]
+    pub meta: Account<'info, SkipListMeta>,
+
+    #[account(
+        init,
+        payer = signer,
+        space = SkipNode::LEN,
+        seeds=[b"node", key.as_slice()],
+        bump
+    )]
+    pub new_node: Account<'info, SkipNode>,
+
+    #[account(
+        init,
+        payer = signer,
+        space = ValueAccount::LEN,
+        seeds=[b"value", key.as_slice()],
+        bump
+    )]
+    pub value_account: Account<'info, ValueAccount>,
+
     #[account(mut)]
     pub signer: Signer<'info>,
 
-    #[account(
-        init_if_needed,
-        payer = signer,
-        space = PDA_LEN + value.len(),
-        seeds = [KV_ACCOUNT_SEED, id.as_bytes()],
-        bump,
-        realloc,
-        realloc::payer = signer,
-        realloc::zero = false,
-    )]
-    pub kv_account: Account<'info, KVData>,
-
-    /// CHECK: 协议手续费归集账户
-    #[account(
-        mut, 
-        seeds = [TREASURY_SEED], 
-        bump = treasury_bump,
-    )]
-    pub treasury: UncheckedAccount<'info>,
-    pub treasury_bump: u8,
     pub system_program: Program<'info, System>,
 }
 
-pub fn upsert_kv(
-    ctx: Context<UpsertKV>,
-    id: String,
-    value: Vec<u8>,
-    mode: StorageMode,
-) -> Result<()> {
-    let clock = Clock::get()?;
-    match mode {
-        StorageMode::Compressed => {
-            // 调用压缩库指令：将数据写入 Merkle Tree Leaf
-            // 此时数据不在账户里，由 RPC Indexer 索引
-            msg!("Data compressed for ID: {}", id);
+/// upsert:
+/// 需要通过 remaining_accounts 传入“沿途会被更新 forward 的节点账户”
+/// 顺序：从高层到低层的 prev 节点（长度 = MAX_LEVEL，找不到就传 head）
+pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+    require!(key.len() <= MAX_KEY_LEN, Error::KeyTooLong);
+    require!(value.len() <= MAX_VALUE_LEN, Error::ValueTooLarge);
 
-        }
-        StorageMode::Permanent => {
-            // 逻辑：如果是永久存储，收取 0.001 SOL 服务费
-            let fee = 1_000_000; // 0.001 SOL
-            let instruction = system_instruction::transfer(
-                &ctx.accounts.signer.key(),
-                &ctx.accounts.treasury.key(),
-                fee,
-            );
-            let account_infos = [
-                ctx.accounts.signer.to_account_info(),
-                ctx.accounts.treasury.to_account_info(),
-            ];
-            invoke(&instruction, &account_infos)?;
-            // 写入数据到原生账户
-            let kv_acc = &mut ctx.accounts.kv_account;
-            kv_acc.data = value;
-            kv_acc.owner = ctx.accounts.signer.key();
-            kv_acc.last_updated = clock.unix_timestamp;
-        }
+    let _meta = &ctx.accounts.meta;
+    let new_node = &mut ctx.accounts.new_node;
+    let value_acc = &mut ctx.accounts.value_account;
+
+    // 1️⃣ 计算 level
+    let lvl = calc_level(&key);
+
+    // 2️⃣ 填充 new node
+    new_node.key = key.clone();
+    new_node.value = value_acc.key();
+    new_node.level = lvl;
+    new_node.forward = [Pubkey::default(); MAX_LEVEL];
+
+    // 3️⃣ 写 value
+    value_acc.data = value;
+
+    // 4️⃣ 处理 prev（来自 remaining_accounts）
+    // 约定：remaining_accounts 长度 = MAX_LEVEL
+    if ctx.remaining_accounts.len() != MAX_LEVEL {
+        return err!(Error::InvalidRemaining);
     }
+
+    // 5️⃣ 更新 forward
+    for i in 0..(lvl as usize) {
+        // 1. 获取 AccountInfo 的引用
+        let prev_info = &ctx.remaining_accounts[i];
+
+        // 2. 手动反序列化数据
+        // 这样不会产生复杂的生命周期绑定，直接从 data 借用
+        let mut prev_data = prev_info.try_borrow_mut_data()?;
+
+        // 假设你的 SkipNode 结构体已经 derive 了 AnchorSerialize/Deserialize
+        // 跳过 Anchor 的 8 字节 discriminator
+        let mut prev = SkipNode::deserialize(&mut &prev_data[8..])?;
+
+        // new.forward[i] = prev.forward[i]
+        new_node.forward[i] = prev.forward[i];
+
+        // prev.forward[i] = new
+        prev.forward[i] = new_node.key();
+
+        // 4. 手动写回数据 (这一步非常重要，替代了 exit)
+        let mut writer = &mut prev_data[8..];
+        prev.serialize(&mut writer)?;
+    }
+
     Ok(())
 }

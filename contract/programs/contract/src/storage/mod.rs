@@ -4,7 +4,7 @@ pub(crate) mod initialize;
 pub(crate) mod scan;
 pub(crate) mod storage_structs;
 pub(crate) mod upsert;
-pub(crate) mod utils;
+
 
 pub use initialize::*;
 pub use upsert::*;

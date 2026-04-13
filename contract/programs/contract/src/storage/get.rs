@@ -3,10 +3,8 @@ use anchor_lang::prelude::*;
 use crate::{
     constants::{HEAD_SEEDS, META_SEEDS, NODE_SEEDS},
     error::Error,
-    storage::{
-        storage_structs::{SkipListMeta, SkipNode, ValueAccount},
-        utils::key_cmp,
-    },
+    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+    utils::key_cmp,
 };
 
 #[derive(Accounts)]

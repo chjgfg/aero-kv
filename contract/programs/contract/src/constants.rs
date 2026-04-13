@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
 
-pub const SEED: &[u8] = "aero_kv".as_bytes();
+pub const KV_ACCOUNT_SEED: &[u8] = "aero_kv".as_bytes();
+
+pub const TREASURY_SEED: &[u8] = "treasury".as_bytes();
 
 pub const PDA_LEN: usize = 8 + 32 + 8 + 4;
 

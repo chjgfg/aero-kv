@@ -1,5 +1,5 @@
-use crate::constants::{KVData, StorageMode, PDA_LEN, SEED};
 use anchor_lang::prelude::{program::invoke, *};
+use crate::constants::{KVData, StorageMode, PDA_LEN, KV_ACCOUNT_SEED, TREASURY_SEED};
 
 #[derive(Accounts)]
 #[instruction(id: String, value:Vec<u8>)]
@@ -11,7 +11,7 @@ pub struct UpsertKV<'info> {
         init_if_needed,
         payer = signer,
         space = PDA_LEN + value.len(),
-        seeds = [SEED, id.as_bytes()],
+        seeds = [KV_ACCOUNT_SEED, id.as_bytes()],
         bump,
         realloc,
         realloc::payer = signer,
@@ -22,11 +22,11 @@ pub struct UpsertKV<'info> {
     /// CHECK: 协议手续费归集账户
     #[account(
         mut, 
-        seeds = [b"treasury"], 
-        bump
+        seeds = [TREASURY_SEED], 
+        bump = treasury_bump,
     )]
     pub treasury: UncheckedAccount<'info>,
-
+    pub treasury_bump: u8,
     pub system_program: Program<'info, System>,
 }
 

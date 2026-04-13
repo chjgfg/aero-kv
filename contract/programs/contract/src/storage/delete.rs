@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::{KVData, SEED}, error::Error};
+use crate::{constants::{KVData, KV_ACCOUNT_SEED}, error::Error};
 
 
 #[derive(Accounts)]
@@ -11,7 +11,7 @@ pub struct DeleteKV<'info>{
 
     #[account(
         mut,
-        seeds = [SEED, id.as_bytes()],
+        seeds = [KV_ACCOUNT_SEED, id.as_bytes()],
         bump,  
         close = signer,
 

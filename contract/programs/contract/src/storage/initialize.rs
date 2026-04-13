@@ -29,6 +29,7 @@ pub struct Initialize<'info> {
 }
 
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    msg!("Greetings from: {:?}", ctx.program_id);
     let meta = &mut ctx.accounts.meta;
     let head = &mut ctx.accounts.head;
 

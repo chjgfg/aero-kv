@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
-mod storage;
-mod error;
 mod constants;
+mod error;
+mod storage;
 
 declare_id!("GgAUi3CiVHE8hxoAMu9pdXEJsrV2JHdfeqKgavdrXmdm");
 
@@ -9,11 +9,25 @@ declare_id!("GgAUi3CiVHE8hxoAMu9pdXEJsrV2JHdfeqKgavdrXmdm");
 pub mod contract {
     use super::*;
 
+    pub use super::storage::*;
+    
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        msg!("Greetings from: {:?}", ctx.program_id);
-        Ok(())
+        storage::initialize(ctx)
+    }
+
+    pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
+        storage::get(ctx, key)
+    }
+
+    pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
+        storage::delete(ctx, key)
+    }
+
+    pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
+        storage::scan(ctx, start, limit)
+    }
+
+    pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+        storage::upsert(ctx, key, value)
     }
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}

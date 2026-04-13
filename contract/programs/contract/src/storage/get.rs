@@ -1,7 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{HEAD_SEEDS, META_SEEDS, NODE_SEEDS}, error::Error, storage::{storage_structs::{SkipListMeta, SkipNode, ValueAccount}, utils::key_cmp}
+    constants::{HEAD_SEEDS, META_SEEDS, NODE_SEEDS},
+    error::Error,
+    storage::{
+        storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+        utils::key_cmp,
+    },
 };
 
 #[derive(Accounts)]
@@ -19,6 +24,7 @@ pub struct Get<'info> {
 }
 
 pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
+    msg!("Greetings from: {:?}", ctx.program_id);
     // 1. 用一个变量标记最后匹配成功的“前驱节点”在哪里
     // -1 表示 head，0 及以上表示 remaining_accounts 的索引
     let mut last_found_idx: i32 = -1;

@@ -9,11 +9,15 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 #[instruction(key: Vec<u8>)]
 pub struct Upsert<'info> {
+    
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
     #[account(mut, seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = SkipNode::LEN,
         seeds=[NODE_SEEDS, key.as_slice()],
@@ -22,16 +26,13 @@ pub struct Upsert<'info> {
     pub new_node: Account<'info, SkipNode>,
 
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = ValueAccount::LEN,
         seeds=[VALUE_SEEDS, key.as_slice()],
         bump
     )]
     pub value_account: Account<'info, ValueAccount>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }

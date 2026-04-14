@@ -1,6 +1,9 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::META_SEEDS, storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount}};
+use crate::{
+    constants::META_SEEDS,
+    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+};
 
 #[event]
 pub struct KVPair {
@@ -14,6 +17,7 @@ pub struct Scan<'info> {
 }
 
 pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
+    msg!("SCAN_START: limit={}, start_len={}", limit, start.len()); // 加上这一行
     let mut count: u64 = 0;
     let mut i: usize = 0;
 
@@ -33,7 +37,7 @@ pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
             // 手动反序列化 Value 数据
             let value_data = value_info.try_borrow_data()?;
             let value_acc = ValueAccount::deserialize(&mut &value_data[8..])?;
-
+            msg!("DEBUG: About to emit KVPair for key {:?}", node.key);
             emit!(KVPair {
                 key: node.key.clone(),
                 value: value_acc.data.clone(),

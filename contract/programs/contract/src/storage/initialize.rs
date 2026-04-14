@@ -4,8 +4,11 @@ use crate::{constants::{HEAD_SEEDS, MAX_LEVEL, META_SEEDS}, storage::storage_str
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
     #[account(
-        init, 
+        init_if_needed, 
         payer = signer, 
         space = SkipListMeta::LEN, 
         seeds=[META_SEEDS], 
@@ -14,16 +17,13 @@ pub struct Initialize<'info> {
     pub meta: Account<'info, SkipListMeta>,
 
     #[account(
-        init, 
+        init_if_needed, 
         payer = signer, 
         space = SkipNode::LEN, 
         seeds=[HEAD_SEEDS], 
         bump
     )]
     pub head: Account<'info, SkipNode>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }

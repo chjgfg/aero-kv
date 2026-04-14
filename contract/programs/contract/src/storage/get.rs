@@ -26,10 +26,11 @@ pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
     // 1. 用一个变量标记最后匹配成功的“前驱节点”在哪里
     // -1 表示 head，0 及以上表示 remaining_accounts 的索引
     let mut last_found_idx: i32 = -1;
-
+    msg!("remaining_accounts.len {:?}", ctx.remaining_accounts.len());
     // 使用普通的 range 循环，通过下标访问
     for i in 0..ctx.remaining_accounts.len() {
         let acc = &ctx.remaining_accounts[i];
+        msg!("acc: {:?}", acc);
 
         // 1. 获取数据进行比较 (这里只读，不需要长寿命引用)
         let node_data = acc.try_borrow_data()?;

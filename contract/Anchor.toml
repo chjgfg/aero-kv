@@ -17,3 +17,11 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
+
+# [test]
+# # 开启日志打印，会自动把所有 msg! 输出到终端
+# show_logs = true
+
+[test.validator]
+# 开启日志记录
+log_messages = true

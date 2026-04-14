@@ -1,5 +1,3 @@
-use anchor_lang::prelude::*;
-
 pub const MAX_LEVEL: usize = 8;
 pub const MAX_KEY_LEN: usize = 64;
 pub const MAX_VALUE_LEN: usize = 1024;

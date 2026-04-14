@@ -53,3 +53,5 @@ docs
 /contract/test-ledger
 /contract/.yarn
 /contract/Cargo.lock
+
+test-ledger

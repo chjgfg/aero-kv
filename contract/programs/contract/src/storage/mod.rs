@@ -2,7 +2,7 @@ pub(crate) mod delete;
 pub(crate) mod get;
 pub(crate) mod initialize;
 pub(crate) mod scan;
-pub(crate) mod storage_structs;
+pub(crate) mod structs;
 pub(crate) mod upsert;
 
 

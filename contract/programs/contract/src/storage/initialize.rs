@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-use crate::{constants::{HEAD_SEEDS, MAX_LEVEL, META_SEEDS}, storage::storage_structs::{SkipListMeta, SkipNode}};
+use crate::{constants::{HEAD_SEEDS, MAX_LEVEL, META_SEEDS}, storage::structs::{SkipListMeta, SkipNode}};
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {

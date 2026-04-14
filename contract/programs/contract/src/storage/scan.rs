@@ -1,8 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::META_SEEDS,
-    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+    auth::structs::AuthConfig,
+    constants::{AUTH_SEEDS, FEE_SEEDS, META_SEEDS},
+    error::Error,
+    fee::FeeConfig,
+    storage::structs::{SkipListMeta, SkipNode, ValueAccount},
+    utils::charge,
 };
 
 #[event]
@@ -12,12 +16,30 @@ pub struct KVPair {
 }
 #[derive(Accounts)]
 pub struct Scan<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>, // ⭐ scan 也要收费
+
     #[account(seeds=[META_SEEDS], bump)]
     pub meta: Account<'info, SkipListMeta>,
+
+    #[account(seeds = [AUTH_SEEDS], bump)]
+    pub auth_config: Account<'info, AuthConfig>,
+    
+    #[account(seeds = [FEE_SEEDS], bump)]
+    pub fee_config: Account<'info, FeeConfig>,
+
+    #[account(mut)]
+    pub treasury: SystemAccount<'info>,
 }
 
 pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
+    // 权限控制
+    require!(!ctx.accounts.auth_config.paused, Error::Paused);
+
     msg!("SCAN_START: limit={}, start_len={}", limit, start.len()); // 加上这一行
+
+    let fee_config = &ctx.accounts.fee_config;
+
     let mut count: u64 = 0;
     let mut i: usize = 0;
 
@@ -47,6 +69,15 @@ pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
 
         i += 2;
     }
+
+    // 🔥 按返回数量收费
+    let fee = fee_config.scan_fee_per_item * count;
+
+    charge(
+        &ctx.accounts.signer,
+        &ctx.accounts.treasury.to_account_info(),
+        fee,
+    )?;
 
     Ok(())
 }

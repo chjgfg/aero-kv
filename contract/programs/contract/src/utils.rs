@@ -1,6 +1,8 @@
+use anchor_lang::prelude::*;
 use solana_program::keccak::hashv;
 
 use crate::constants::MAX_LEVEL;
+use crate::error::Error;
 
 pub fn calc_level(key: &[u8]) -> u8 {
     // 确定性 level：用 keccak hash
@@ -19,4 +21,16 @@ pub fn calc_level(key: &[u8]) -> u8 {
 
 pub fn key_cmp(a: &[u8], b: &[u8]) -> core::cmp::Ordering {
     a.cmp(b)
+}
+
+pub fn charge(payer: &Signer, treasury: &AccountInfo, amount: u64) -> Result<()> {
+    require!(
+        **payer.to_account_info().lamports.borrow() >= amount,
+        Error::InsufficientFee
+    );
+
+    **payer.to_account_info().try_borrow_mut_lamports()? -= amount;
+    **treasury.try_borrow_mut_lamports()? += amount;
+
+    Ok(())
 }

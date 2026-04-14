@@ -1,9 +1,7 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
-    error::Error,
-    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+    auth::structs::AuthConfig, constants::{AUTH_SEEDS, FEE_SEEDS, MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS}, error::Error, fee::FeeConfig, storage::structs::{SkipListMeta, SkipNode, ValueAccount}, utils::charge
 };
 
 #[derive(Accounts)]
@@ -29,10 +27,31 @@ pub struct Delete<'info> {
     )]
     pub value_account: Account<'info, ValueAccount>,
 
+    #[account(seeds = [AUTH_SEEDS], bump)]
+    pub auth_config: Account<'info, AuthConfig>,
+    
+    #[account(seeds = [FEE_SEEDS], bump)]
+    pub fee_config: Account<'info, FeeConfig>,
+
+    #[account(mut)]
+    pub treasury: SystemAccount<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
 pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
+    // 权限控制
+    require!(!ctx.accounts.auth_config.paused, Error::Paused);
+    
+    // 2️⃣ 收费（删除只收基础费）
+    let fee = ctx.accounts.fee_config.base_fee;
+
+    charge(
+        &ctx.accounts.signer,
+        &ctx.accounts.treasury.to_account_info(),
+        fee,
+    )?;
+
     let target = &ctx.accounts.target;
 
     require!(target.key == key, Error::NotFound);

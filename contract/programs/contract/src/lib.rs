@@ -1,6 +1,8 @@
 use anchor_lang::prelude::*;
+mod auth;
 mod constants;
 mod error;
+mod fee;
 mod storage;
 mod utils;
 
@@ -11,7 +13,7 @@ pub mod contract {
     use super::*;
 
     pub use super::storage::*;
-    
+
     pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
         storage::initialize(ctx)
     }

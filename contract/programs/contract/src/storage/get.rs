@@ -1,9 +1,10 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    constants::{HEAD_SEEDS, META_SEEDS, NODE_SEEDS},
+    auth::structs::AuthConfig,
+    constants::{AUTH_SEEDS, HEAD_SEEDS, META_SEEDS, NODE_SEEDS},
     error::Error,
-    storage::storage_structs::{SkipListMeta, SkipNode, ValueAccount},
+    storage::structs::{SkipListMeta, SkipNode, ValueAccount},
     utils::key_cmp,
 };
 
@@ -18,10 +19,16 @@ pub struct Get<'info> {
     #[account(seeds=[NODE_SEEDS, target.key.as_slice()], bump)]
     pub target: Account<'info, SkipNode>,
 
+    #[account(seeds = [AUTH_SEEDS], bump)]
+    pub auth_config: Account<'info, AuthConfig>,
+
     pub value_account: Account<'info, ValueAccount>,
 }
 
 pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
+    // 权限控制
+    require!(!ctx.accounts.auth_config.paused, Error::Paused);
+
     msg!("Greetings from: {:?}", ctx.program_id);
     // 1. 用一个变量标记最后匹配成功的“前驱节点”在哪里
     // -1 表示 head，0 及以上表示 remaining_accounts 的索引

@@ -16,4 +16,8 @@ pub enum Error {
     NotFound,
     #[msg("Invalid remaining accounts")]
     InvalidRemaining,
+    #[msg("insufficient fee")]
+    InsufficientFee,
+    #[msg("System paused")]
+    Paused,
 }

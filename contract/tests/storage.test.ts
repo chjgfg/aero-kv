@@ -22,6 +22,15 @@ describe("contract", () => {
     const [valuePda] = PublicKey.findProgramAddressSync([Buffer.from("value"), key], program.programId);
 
 
+    // ==========================
+    // 🎯 新增：必须传入 3 个新账户
+    // ==========================
+    const [authConfigPda] = PublicKey.findProgramAddressSync([Buffer.from("auth")], program.programId);
+    const [feeConfigPda] = PublicKey.findProgramAddressSync([Buffer.from("fee")], program.programId);
+
+    // 国库地址（随便用一个地址，测试能过就行）
+    const treasury = payer.publicKey;
+
     const MAX_LEVEL = 8;
     const remainingAccounts = Array(MAX_LEVEL).fill(headPda);
 
@@ -65,6 +74,9 @@ describe("contract", () => {
                 meta: metaPda,
                 newNode: nodePda,
                 valueAccount: valuePda,
+                authConfig: authConfigPda,
+                feeConfig: feeConfigPda,
+                treasury: treasury,
                 systemProgram: SystemProgram.programId
             })
             .remainingAccounts(

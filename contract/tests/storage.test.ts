@@ -1,7 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { Contract } from "../target/types/contract";
-import { PublicKey, LAMPORTS_PER_SOL, SystemProgram } from "@solana/web3.js";
+import { PublicKey, LAMPORTS_PER_SOL, SystemProgram, Keypair } from "@solana/web3.js";
 import { expect } from "chai";
 
 describe("contract", () => {
@@ -63,6 +63,56 @@ describe("contract", () => {
     });
 
 
+    it("set_admin", async () => {
+        // 1. 生成一个新的测试钱包（新管理员）
+        const newAdmin = Keypair.generate();
+
+        // 2. 调用 set_admin 指令
+        const tx = await program.methods
+            .setAdmin(newAdmin.publicKey) // ✅ 这里传新管理员的公钥
+            .accounts({
+                signer: payer.publicKey, // ✅ 当前管理员（必须是 auth_config 里的 admin）
+                authConfig: authPda, // ✅ AuthConfig PDA
+            })
+            .rpc();
+
+        console.log("✅ set_admin 交易成功:", tx);
+
+        // 3. 验证结果：读取 auth_config，确认 admin 已更新
+        const authConfig = await program.account.authConfig.fetch(authPda);
+        console.log("✅ 新管理员地址:", authConfig.admin.toBase58());
+        console.log("✅ 新管理员是否匹配:", authConfig.admin.equals(newAdmin.publicKey));
+    });
+
+    it("set_pause", async () => {
+        // 暂停合约（paused = true）
+        const tx1 = await program.methods
+            .setPause(true)
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+            })
+            .rpc();
+        console.log("✅ 合约暂停成功:", tx1);
+
+        // 验证暂停状态
+        const authConfig1 = await program.account.authConfig.fetch(authPda);
+        console.log("✅ 暂停状态:", authConfig1.paused); // 输出 true
+
+        // 恢复合约（paused = false）
+        const tx2 = await program.methods
+            .setPause(false)
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+            })
+            .rpc();
+        console.log("✅ 合约恢复成功:", tx2);
+
+        // 验证恢复状态
+        const authConfig2 = await program.account.authConfig.fetch(authPda);
+        console.log("✅ 恢复状态:", authConfig2.paused); // 输出 false
+    });
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -86,6 +136,32 @@ describe("contract", () => {
         // 无论是否初始化，都验证账户数据
         const fee = await program.account.feeConfig.fetch(feePda);
         console.log("fee", fee);
+    });
+
+
+    it("set_fee", async () => {
+
+        // 2. 调用 setFee
+        const tx = await program.methods
+            .setFee(
+                new anchor.BN(100000), // base_fee: 基础费 0.0001 SOL
+                new anchor.BN(100),    // fee_per_byte: 每字节费
+                new anchor.BN(50000)   // scan_fee_per_item: scan 每条费用
+            )
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+                feeConfig: feePda,
+            })
+            .rpc();
+
+        console.log("✅ set_fee 成功", tx);
+
+        // 3. 验证是否设置成功
+        const feeData = await program.account.feeConfig.fetch(feePda);
+        console.log("base_fee:", feeData.baseFee.toString());
+        console.log("fee_per_byte:", feeData.feePerByte.toString());
+        console.log("scan_fee_per_item:", feeData.scanFeePerItem.toString());
     });
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------

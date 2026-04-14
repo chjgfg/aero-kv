@@ -10,6 +10,7 @@ declare_id!("GgAUi3CiVHE8hxoAMu9pdXEJsrV2JHdfeqKgavdrXmdm");
 
 #[program]
 pub mod contract {
+
     use super::*;
 
     pub use super::storage::*;
@@ -41,10 +42,27 @@ pub mod contract {
         auth::init_auth(ctx)
     }
 
+    pub fn set_admin(ctx: Context<SetAdmin>, new_admin: Pubkey) -> Result<()> {
+        auth::set_admin(ctx, new_admin)
+    }
+
+    pub fn set_pause(ctx: Context<SetPause>, paused: bool) -> Result<()> {
+        auth::set_pause(ctx, paused)
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     pub use super::fee::*;
 
     pub fn init_fee(ctx: Context<InitFee>) -> Result<()> {
         fee::init_fee(ctx)
+    }
+
+    pub fn set_fee(
+        ctx: Context<SetFee>,
+        base_fee: u64,
+        fee_per_byte: u64,
+        scan_fee_per_item: u64,
+    ) -> Result<()> {
+        fee::set_fee(ctx, base_fee, fee_per_byte, scan_fee_per_item)
     }
 }

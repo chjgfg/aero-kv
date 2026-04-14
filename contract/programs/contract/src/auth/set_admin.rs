@@ -8,9 +8,10 @@ pub struct SetAdmin<'info> {
     pub signer: Signer<'info>,
 
     #[account(
-         mut,
+        mut,
         seeds = [AUTH_SEEDS], 
-        constraint = auth_config.admin == signer.key(),
+        // ✅ 把权限校验写在账户约束里，彻底避免 require! 宏报错
+        constraint = auth_config.admin == signer.key() @ Error::Unauthorized,
         bump
     )]
     pub auth_config: Account<'info, AuthConfig>,

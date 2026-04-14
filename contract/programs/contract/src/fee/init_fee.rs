@@ -9,7 +9,7 @@ pub struct InitFee<'info> {
 
     // ✅ 初始化 PDA 账户
     #[account(
-        init,
+        init_if_needed,
         payer = signer,
         space = 8 + 8 + 8 + 8 + 32,
         seeds = [FEE_SEEDS],

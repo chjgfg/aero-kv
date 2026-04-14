@@ -14,8 +14,8 @@ pub mod contract {
 
     pub use super::storage::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
-        storage::initialize(ctx)
+    pub fn init_storage(ctx: Context<Initialize>) -> Result<()> {
+        storage::init_storage(ctx)
     }
 
     pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
@@ -32,5 +32,19 @@ pub mod contract {
 
     pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         storage::upsert(ctx, key, value)
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    pub use super::auth::*;
+
+    pub fn init_auth(ctx: Context<InitAuth>) -> Result<()> {
+        auth::init_auth(ctx)
+    }
+
+    // ---------------------------------------------------------------------------------------------------------
+    pub use super::fee::*;
+
+    pub fn init_fee(ctx: Context<InitFee>) -> Result<()> {
+        fee::init_fee(ctx)
     }
 }

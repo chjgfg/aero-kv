@@ -28,7 +28,7 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+pub fn init_storage(ctx: Context<Initialize>) -> Result<()> {
     msg!("Greetings from: {:?}", ctx.program_id);
     let meta = &mut ctx.accounts.meta;
     let head = &mut ctx.accounts.head;

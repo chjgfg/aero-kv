@@ -4,3 +4,4 @@ pub mod structs;
 
 pub use set_fee::*;
 pub use structs::*;
+pub use init_fee::*;

@@ -25,9 +25,8 @@ describe("contract", () => {
     // ==========================
     // 🎯 新增：必须传入 3 个新账户
     // ==========================
-    const [authConfigPda] = PublicKey.findProgramAddressSync([Buffer.from("auth")], program.programId);
-    const [feeConfigPda] = PublicKey.findProgramAddressSync([Buffer.from("fee")], program.programId);
-
+    const [authPda] = PublicKey.findProgramAddressSync([Buffer.from("auth")], program.programId);
+    const [feePda] = PublicKey.findProgramAddressSync([Buffer.from("fee")], program.programId);
     // 国库地址（随便用一个地址，测试能过就行）
     const treasury = payer.publicKey;
 
@@ -39,7 +38,59 @@ describe("contract", () => {
         await provider.connection.requestAirdrop(payer.publicKey, 100 * LAMPORTS_PER_SOL);
     });
 
-    it("Is initialized!", async () => {
+    it("auth init!", async () => {
+        console.log("当前测试钱包地址:", payer.publicKey.toBase58());
+        // 🔴 关键：检查账户是否已存在
+        const authAccountInfo = await provider.connection.getAccountInfo(authPda);
+        if (!authAccountInfo) {
+            // 账户不存在，才执行初始化
+            const tx = await program.methods
+                .initAuth()
+                .accounts({
+                    signer: payer.publicKey,
+                    authConfig: authPda,
+                    systemProgram: SystemProgram.programId
+                }).rpc();
+            console.log("Your transaction signature", tx);
+        } else {
+            console.log("Auth PDA 已初始化，跳过初始化步骤");
+        }
+        // 无论是否初始化，都验证账户数据
+        const auth = await program.account.authConfig.fetch(authPda);
+        console.log("auth", auth);
+    });
+
+
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+    it("fee init!", async () => {
+        console.log("当前测试钱包地址:", payer.publicKey.toBase58());
+        // 🔴 关键：检查账户是否已存在
+        const feeAccountInfo = await provider.connection.getAccountInfo(feePda);
+        if (!feeAccountInfo) {
+            // 账户不存在，才执行初始化
+            const tx = await program.methods
+                .initFee()
+                .accounts({
+                    signer: payer.publicKey,
+                    feeConfig: feePda,
+                    systemProgram: SystemProgram.programId
+                }).rpc();
+            console.log("Your transaction signature", tx);
+        } else {
+            console.log("Fee PDA 已初始化，跳过初始化步骤");
+        }
+        // 无论是否初始化，都验证账户数据
+        const fee = await program.account.feeConfig.fetch(feePda);
+        console.log("fee", fee);
+    });
+
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+    it("storage init!", async () => {
         console.log("当前测试钱包地址:", payer.publicKey.toBase58());
         console.log("Meta PDA:", metaPda.toBase58());
         console.log("Head PDA:", headPda.toBase58());
@@ -48,7 +99,7 @@ describe("contract", () => {
         if (!metaAccountInfo) {
             // 账户不存在，才执行初始化
             const tx = await program.methods
-                .initialize()
+                .initStorage()
                 .accounts({
                     signer: payer.publicKey,
                     meta: metaPda,
@@ -74,8 +125,8 @@ describe("contract", () => {
                 meta: metaPda,
                 newNode: nodePda,
                 valueAccount: valuePda,
-                authConfig: authConfigPda,
-                feeConfig: feeConfigPda,
+                authConfig: authPda,
+                feeConfig: feePda,
                 treasury: treasury,
                 systemProgram: SystemProgram.programId
             })
@@ -112,6 +163,7 @@ describe("contract", () => {
                 meta: metaPda,
                 head: headPda,
                 target: nodePda,
+                authConfig: authPda,
                 valueAccount: valuePda,
             })
             .rpc();
@@ -136,6 +188,9 @@ describe("contract", () => {
                 meta: metaPda,
                 target: nodePda,
                 valueAccount: valuePda,
+                authConfig: authPda,
+                feeConfig: feePda,
+                treasury: treasury,
                 systemProgram: SystemProgram.programId
             })
             .remainingAccounts(
@@ -202,7 +257,9 @@ describe("contract", () => {
                     meta: metaPda,
                     newNode: nodePda,
                     valueAccount: valuePda,
-                    systemProgram: SystemProgram.programId,
+                    authConfig: authPda,
+                    feeConfig: feePda,
+                    treasury: treasury,
                 })
                 .remainingAccounts(
                     Array(MAX_LEVEL).fill(headPda).map((k) => ({

@@ -1,7 +1,8 @@
 use crate::{
     auth::structs::AuthConfig,
     constants::{
-        AUTH_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_LEVEL, MAX_VALUE_LEN, META_SEEDS, NODE_SEEDS, VALUE_SEEDS
+        AUTH_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_LEVEL, MAX_VALUE_LEN, META_SEEDS, NODE_SEEDS,
+        VALUE_SEEDS,
     },
     error::Error,
     fee::FeeConfig,

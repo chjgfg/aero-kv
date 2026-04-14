@@ -7,10 +7,16 @@ pub struct SetAdmin<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
-    #[account(seeds = [AUTH_SEEDS], bump)]
+    #[account(
+         mut,
+        seeds = [AUTH_SEEDS], 
+        constraint = auth_config.admin == signer.key(),
+        bump
+    )]
     pub auth_config: Account<'info, AuthConfig>,
 }
 
+/// 更换管理员
 pub fn set_admin(ctx: Context<SetAdmin>, new_admin: Pubkey) -> Result<()> {
     let config = &mut ctx.accounts.auth_config;
 

@@ -38,6 +38,8 @@ describe("contract", () => {
         await provider.connection.requestAirdrop(payer.publicKey, 100 * LAMPORTS_PER_SOL);
     });
 
+    // -------------------------------------------------------------------------------------------------------------------------------------------------------
+
     it("auth init!", async () => {
         console.log("当前测试钱包地址:", payer.publicKey.toBase58());
         // 🔴 关键：检查账户是否已存在
@@ -87,8 +89,6 @@ describe("contract", () => {
     });
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
 
     it("storage init!", async () => {
         console.log("当前测试钱包地址:", payer.publicKey.toBase58());
@@ -260,6 +260,7 @@ describe("contract", () => {
                     authConfig: authPda,
                     feeConfig: feePda,
                     treasury: treasury,
+                    systemProgram: SystemProgram.programId,
                 })
                 .remainingAccounts(
                     Array(MAX_LEVEL).fill(headPda).map((k) => ({
@@ -306,7 +307,13 @@ describe("contract", () => {
         try {
             const tx = await program.methods
                 .scan(scanStartKey, scanLimit)
-                .accounts({ meta: metaPda })
+                .accounts({
+                    signer: payer.publicKey,
+                    meta: metaPda,
+                    authConfig: authPda,
+                    feeConfig: feePda,
+                    treasury: treasury,
+                })
                 .remainingAccounts(remainingAccounts)
                 .rpc();
 

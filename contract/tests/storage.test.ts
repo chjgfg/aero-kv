@@ -30,6 +30,9 @@ describe("contract", () => {
     // 国库地址（随便用一个地址，测试能过就行）
     const treasury = payer.publicKey;
 
+    // 1. 生成一个新的测试钱包（新管理员）
+    const newAdmin = Keypair.generate();
+
     const MAX_LEVEL = 8;
     const remainingAccounts = Array(MAX_LEVEL).fill(headPda);
 
@@ -63,10 +66,16 @@ describe("contract", () => {
     });
 
 
-    it("set_admin", async () => {
-        // 1. 生成一个新的测试钱包（新管理员）
-        const newAdmin = Keypair.generate();
-
+    it("set admin", async () => {
+        // 账户不存在，才执行初始化
+        await program.methods
+            .initAuth()
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+                systemProgram: SystemProgram.programId
+            }).rpc();
+        console.log("set admin 先授权");
         // 2. 调用 set_admin 指令
         const tx = await program.methods
             .setAdmin(newAdmin.publicKey) // ✅ 这里传新管理员的公钥
@@ -84,7 +93,16 @@ describe("contract", () => {
         console.log("✅ 新管理员是否匹配:", authConfig.admin.equals(newAdmin.publicKey));
     });
 
-    it("set_pause", async () => {
+    it("set pause", async () => {
+        // 账户不存在，才执行初始化
+        await program.methods
+            .initAuth()
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+                systemProgram: SystemProgram.programId
+            }).rpc();
+        console.log("set pause 先授权");
         // 暂停合约（paused = true）
         const tx1 = await program.methods
             .setPause(true)
@@ -139,8 +157,16 @@ describe("contract", () => {
     });
 
 
-    it("set_fee", async () => {
-
+    it("set fee", async () => {
+        // 账户不存在，才执行初始化
+        await program.methods
+            .initAuth()
+            .accounts({
+                signer: payer.publicKey,
+                authConfig: authPda,
+                systemProgram: SystemProgram.programId
+            }).rpc();
+        console.log("set fee 先授权");
         // 2. 调用 setFee
         const tx = await program.methods
             .setFee(

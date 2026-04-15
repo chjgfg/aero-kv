@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 use crate::{constants::{HEAD_SEEDS, MAX_LEVEL, META_SEEDS}, storage::structs::{SkipListMeta, SkipNode}};
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct InitStorage<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
@@ -28,7 +28,7 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn init_storage(ctx: Context<Initialize>) -> Result<()> {
+pub fn init_storage(ctx: Context<InitStorage>) -> Result<()> {
     msg!("Greetings from: {:?}", ctx.program_id);
     let meta = &mut ctx.accounts.meta;
     let head = &mut ctx.accounts.head;

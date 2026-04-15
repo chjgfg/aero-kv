@@ -21,8 +21,10 @@ custom-panic = []
 
 
 [dependencies]
-anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
-solana-program = "4.0.0"
+# anchor-lang = { version = "0.31.1", features = ["init-if-needed"] }
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+# solana-program = "4.0.0"
+solana-program = "1.18.13" # 降回到 1.18 系列
 
 
 [lints.rust]

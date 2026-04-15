@@ -23,28 +23,6 @@ actix-cors = "0.7"  # 请根据最新版本调整
 tokio = { version = "1.45.1", features = ["full"] }
 
 
-# --- WebSocket (关键修复点) ---
-# # tokio的websocket实现
-# # 升级到 0.24.0 以匹配 reqwest 的 rustls 版本
-# tokio-tungstenite = { version = "0.24.0", features = [
-#     # "rustls-tls-webpki-roots",
-#     "native-tls",
-# ] }
-# # 异步处理websocket消息
-# futures-util = "0.3.30"
-# tokio-socks = "0.5"     # 关键：用于建立代理隧道
-
-# --- HTTP 请求 (关键修复点) ---
-# 这里的 rustls-tls 会与上面的 tokio-tungstenite 兼容了
-# reqwest = { version = "0.12.22", features = [
-#     "json",
-#     "socks",
-#     "gzip",
-#     "blocking",
-#     "native-tls",
-#     "default-tls",
-# ], default-features = false }
-
 # --- 序列化 & 工具 ---
 # 处理日期、时间
 chrono = "0.4.22"
@@ -79,3 +57,5 @@ rand = "0.8"
 actix = "0.13.5"
 actix-web-actors = "4.3.1"
 dotenv = "0.15.0" 
+# 合约
+contract = { path = "../contract/programs/contract", features = ["cpi"] }

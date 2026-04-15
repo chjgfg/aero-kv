@@ -15,7 +15,7 @@ pub mod contract {
 
     pub use super::storage::*;
 
-    pub fn init_storage(ctx: Context<Initialize>) -> Result<()> {
+    pub fn init_storage(ctx: Context<InitStorage>) -> Result<()> {
         storage::init_storage(ctx)
     }
 

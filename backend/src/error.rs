@@ -14,6 +14,7 @@ pub enum Error {
     ConfigError(String),
     ProgramIdError(String),
     PayerKeypairError(String),
+    PubKeyError,
 }
 
 impl Display for Error {
@@ -26,6 +27,7 @@ impl Display for Error {
             Error::RpcUrlError(msg) => write!(f, "RPC 路径错误: {msg}"),
             Error::ProgramIdError(msg) => write!(f, "Program Id 错误: {msg}"),
             Error::PayerKeypairError(msg) => write!(f, "Payer Keypair 错误: {msg}"),
+            Error::PubKeyError => write!(f, "Pubkey 错误"),
         }
     }
 }

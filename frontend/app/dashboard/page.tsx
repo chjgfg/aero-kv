@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 type HealthResponse = {
     status: string;
-    program: string;
+    program_id: string;
     message?: string;
 };
 
@@ -29,8 +29,9 @@ export default function DashboardPage() {
             if (!connected) return;
             try {
                 // 替换为你的后端地址
-                const res = await fetch("http://192.168.40.131:80/health");
+                const res = await fetch("http://192.168.40.131/health");
                 const data = await res.json();
+                console.log(data);
                 setHealth(data);
             } catch (err) {
                 console.error("健康检查失败:", err);
@@ -77,7 +78,7 @@ export default function DashboardPage() {
                                 <span>状态：{health.status}</span>
                             </div>
                             <div className="text-sm text-gray-300">
-                                程序ID：{health.program}
+                                程序ID：{health.program_id}
                             </div>
                         </div>
                     ) : (

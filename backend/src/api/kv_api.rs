@@ -5,6 +5,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+use log::info;
 
 use crate::AppState;
 
@@ -22,6 +23,7 @@ pub struct KVQuery {
 
 // 示例 KV 接口（你可以替换成自己的业务逻辑）
 pub async fn init_storage(State(client): State<AppState>) -> impl IntoResponse {
+    info!("init storage");
     let _ = client.init_storage().await;
     // 这里写你的 upsert 业务逻辑
     (StatusCode::OK, "init storage success")
@@ -31,6 +33,7 @@ pub async fn upsert(
     State(client): State<AppState>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
+    info!("upsert key: {}, value: {}", req.key, req.value);
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
     let _ = client.upsert(k, v).await;
@@ -42,18 +45,21 @@ pub async fn delete(
     State(client): State<AppState>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
+    info!("delete key: {}", req.key);
     let k = req.key.into_bytes();
     let _ = client.delete(k).await;
     (StatusCode::OK, "delete success")
 }
 
 pub async fn gets(State(client): State<AppState>, Query(req): Query<KVQuery>) -> impl IntoResponse {
+    info!("get key: {}", req.key);
     let k = req.key.into_bytes();
     let _ = client.get(k).await;
     (StatusCode::OK, "get success")
 }
 
 pub async fn scan(State(client): State<AppState>, Json(req): Json<KVRequest>) -> impl IntoResponse {
+    info!("scan key: {}, limit: {}", req.key, req.limit);
     let k = req.key.into_bytes();
     let l = req.limit;
     let _ = client.scan(k, l).await;

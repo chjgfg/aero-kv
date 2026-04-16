@@ -16,6 +16,7 @@ use axum::{
     Router,
     routing::{delete, get, post},
 };
+use tower_http::cors::{Any, CorsLayer};
 use log::info;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -33,6 +34,14 @@ async fn main() -> Result<()> {
 
     println!("✅ 链客户端初始化完成，程序ID: {}", state.program_id);
 
+    // 在你创建路由的地方加上这段 CORS
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .expose_headers(Any)
+        .allow_credentials(false);
+    
     // 4. 注册路由（Axum 0.8.x 标准写法）
     let app = Router::new()
         .route("/health", get(api::health))
@@ -49,13 +58,8 @@ async fn main() -> Result<()> {
         // 手续费接口
         .route("/fee/init-fee", post(api::init_fee))
         .route("/fee/set-fee", post(api::set_fee))
-            // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
-    .layer(
-        CorsLayer::new()
-            .allow_origin(axum::http::header::Origin::any())
-            .allow_methods(axum::http::Method::any())
-            .allow_headers(axum::http::header::HeaderName::any()),
-    )
+        // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
+        .layer(cors)
         // 注入状态（Arc<ChainClient>）
         .with_state(state);
 

@@ -4,10 +4,12 @@ use std::str::FromStr;
 
 use crate::{
     config::env_config::Config,
-    error::{Error, Result}, utils::parse_keypair_array,
+    error::{Error, Result},
+    utils::parse_keypair_array,
 };
 use anchor_client::{Client, Cluster, Program};
 use log::info;
+use solana_client::rpc_client::RpcClient;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Keypair};
 
 use std::sync::Arc; // 引入 Arc
@@ -15,6 +17,7 @@ use std::sync::Arc; // 引入 Arc
 pub struct ChainClient {
     // 这里的 C 现在是 Arc<Keypair>, 只写个 Client<Keypair> 会报错
     pub client: Client<Arc<Keypair>>,
+    pub rpc_client: Arc<RpcClient>, // 🔥 关键：新增 RpcClient 字段
     pub program_id: Pubkey,
     pub payer: Arc<Keypair>,
 }
@@ -35,11 +38,14 @@ impl ChainClient {
             Client::new_with_options(cluster, payer_for_client, CommitmentConfig::confirmed());
         let program_id = Pubkey::from_str(&config.program_id)
             .map_err(|e| Error::InvalidProgramId(format!("{}", e)))?;
+        // 2. 创建 RpcClient（同步，可在 spawn_blocking 中使用）
+        let rpc_client = Arc::new(RpcClient::new(config.rpc_url.clone()));
         info!("program_id: {}", program_id);
         Ok(Self {
             client,
             program_id,
             payer,
+            rpc_client,
         })
     }
 

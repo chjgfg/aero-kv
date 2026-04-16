@@ -7,7 +7,7 @@ use axum::{
 };
 use log::info;
 
-use crate::AppState;
+use crate::{AppState, chain};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct KVRequest {
@@ -24,7 +24,7 @@ pub struct KVQuery {
 // 示例 KV 接口（你可以替换成自己的业务逻辑）
 pub async fn init_storage(State(client): State<AppState>) -> impl IntoResponse {
     info!("init storage");
-    let _ = client.init_storage().await;
+    let _ = chain::init_storage(client).await;
     // 这里写你的 upsert 业务逻辑
     (StatusCode::OK, "init storage success")
 }
@@ -36,7 +36,7 @@ pub async fn upsert(
     info!("upsert key: {}, value: {}", req.key, req.value);
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
-    let _ = client.upsert(k, v).await;
+    let _ = chain::upsert(client, k, v).await;
     // 这里写你的 upsert 业务逻辑
     (StatusCode::OK, "upsert success")
 }
@@ -47,14 +47,14 @@ pub async fn delete(
 ) -> impl IntoResponse {
     info!("delete key: {}", req.key);
     let k = req.key.into_bytes();
-    let _ = client.delete(k).await;
+    let _ = chain::delete(client, k).await;
     (StatusCode::OK, "delete success")
 }
 
 pub async fn gets(State(client): State<AppState>, Query(req): Query<KVQuery>) -> impl IntoResponse {
     info!("get key: {}", req.key);
     let k = req.key.into_bytes();
-    let _ = client.get(k).await;
+    let _ = chain::get(client, k).await;
     (StatusCode::OK, "get success")
 }
 
@@ -62,6 +62,6 @@ pub async fn scan(State(client): State<AppState>, Json(req): Json<KVRequest>) ->
     info!("scan key: {}, limit: {}", req.key, req.limit);
     let k = req.key.into_bytes();
     let l = req.limit;
-    let _ = client.scan(k, l).await;
+    let _ = chain::scan(client, k, l).await;
     (StatusCode::OK, "scan success")
 }

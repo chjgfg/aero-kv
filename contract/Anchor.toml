@@ -6,13 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-contract = "GgAUi3CiVHE8hxoAMu9pdXEJsrV2JHdfeqKgavdrXmdm"
+contract = "ErsBN7qXZ8GX9U5FBYiHFx7oGeWfcmJCbr8dgFCfNZ1z"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+# cluster = "localnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=14b461d5-7942-42e0-a492-bd9840e92c66"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

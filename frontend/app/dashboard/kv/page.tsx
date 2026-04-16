@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function KVPage() {
     const [key, setKey] = useState("");
     const [value, setValue] = useState("");
+    const [limit, setLimit] = useState(0);
     const [result, setResult] = useState("");
 
     //  Upsert
@@ -13,7 +14,7 @@ export default function KVPage() {
             const res = await fetch("http://192.168.40.131/kv/upsert", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ key, value }),
+                body: JSON.stringify({ key, value, limit}),
             });
             const data = await res.text();
             setResult(data);

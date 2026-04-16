@@ -38,7 +38,8 @@ describe("contract", () => {
 
     beforeEach(async () => {
         // 每次测试前，重置本地验证器，确保环境干净
-        await provider.connection.requestAirdrop(payer.publicKey, 100 * LAMPORTS_PER_SOL);
+        // 这个在devnet注释掉, 这个是领空投的
+        // await provider.connection.requestAirdrop(payer.publicKey, 100 * LAMPORTS_PER_SOL);
     });
 
     // -------------------------------------------------------------------------------------------------------------------------------------------------------

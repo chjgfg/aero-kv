@@ -1,9 +1,7 @@
 use crate::error::{Error, Result};
 use log::LevelFilter;
 use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogger};
-use std::fs::File;
 use std::path::Path;
-use std::time::{Duration, SystemTime};
 use time::macros::format_description;
 
 pub fn log_config() -> Result<()> {
@@ -15,10 +13,6 @@ pub fn log_config() -> Result<()> {
     logconfig.set_time_format_custom(format_description!(
         "[year]-[month]-[day] [hour]:[minute]:[second]"
     ));
-    // if loglevel != simplelog::LevelFilter::Debug {
-    //     logconfig.add_filter_allow_str("diamonddb");
-    // }
-    // simplelog::SimpleLogger::init(loglevel, logconfig.build())?;
     let log_path = Path::new("./logs/app.log");
     CombinedLogger::init(vec![
         // 控制台彩色日志（0.12.x 仅4个参数）
@@ -41,7 +35,7 @@ pub fn log_config() -> Result<()> {
     ])
     .map_err(|e| Error::LogError(format!("日志初始化失败: {}", e)))?;
     log::info!("✅ 服务启动，日志已写入文件: {}", log_path.display());
-    log::debug!("🔍 调试日志测试");
-    log::error!("❌ 错误日志测试");
+    // log::debug!("🔍 调试日志测试");
+    // log::error!("❌ 错误日志测试");
     Ok(())
 }

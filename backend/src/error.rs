@@ -1,6 +1,6 @@
 // # 后端自定义错误
 
-use std::fmt::Display;
+use std::{fmt::Display, io, net::TcpListener};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -16,6 +16,9 @@ pub enum Error {
     PayerKeypairError(String),
     PubKeyError,
     LogError(String),
+    InvalidKey,
+    ServerPortError(String),
+    IoError(String),
 }
 
 impl Display for Error {
@@ -30,6 +33,23 @@ impl Display for Error {
             Error::PayerKeypairError(msg) => write!(f, "Payer Keypair 错误: {msg}"),
             Error::PubKeyError => write!(f, "Pubkey 错误"),
             Error::LogError(msg) => write!(f, "Log 错误: {msg}"),
+            Error::InvalidKey => write!(f, "无效的 Key"),
+            Error::ServerPortError(msg) => write!(f, "服务端口 错误: {msg}"),
+            Error::IoError(msg) => write!(f, "IO 错误: {msg}"),
         }
     }
 }
+
+// 只保留这一个！自动兼容 tokio + std io::Error
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IoError(format!("{}", e))
+    }
+}
+
+impl From<dotenv::Error> for Error {
+    fn from(e: dotenv::Error) -> Self {
+        Error::ConfigError(format!("{}", e))
+    }
+}
+

@@ -4,9 +4,10 @@ use std::str::FromStr;
 
 use crate::{
     config::env_config::Config,
-    error::{Error, Result},
+    error::{Error, Result}, utils::parse_keypair_array,
 };
 use anchor_client::{Client, Cluster, Program};
+use log::info;
 use solana_sdk::{commitment_config::CommitmentConfig, pubkey::Pubkey, signature::Keypair};
 
 use std::sync::Arc; // 引入 Arc
@@ -21,21 +22,20 @@ pub struct ChainClient {
 impl ChainClient {
     pub fn new(config: &Config) -> Result<Self> {
         // 1. 创建拥有所有权的 Keypair，并直接塞进 Arc 里
-        let payer = Arc::new(Keypair::from_base58_string(config.payer_keypair.as_str()));
-
+        // let payer = Arc::new(Keypair::from_base58_string(config.payer_keypair.as_str()));
+        let key_bytes = parse_keypair_array(config.payer_keypair.as_str())?;
+        let payer = Arc::new(Keypair::from_bytes(&key_bytes).map_err(|_| Error::InvalidKey)?); // 用 from_bytes 解析数组
+        info!("payer: {:?}", payer);
         // 2. 这里的 .clone() 只是拷贝了智能指针，符合 Client<C: Clone> 的要求
         let payer_for_client = payer.clone();
-
         let cluster = Cluster::Custom(config.rpc_url.clone(), config.rpc_url.clone());
-
         // 3. 此时 payer_for_client 类型是 Arc<Keypair>
         // 它满足 Clone 且满足 Deref<Target = Keypair> (Keypair 实现了 Signer)
         let client =
             Client::new_with_options(cluster, payer_for_client, CommitmentConfig::confirmed());
-
         let program_id = Pubkey::from_str(&config.program_id)
             .map_err(|e| Error::InvalidProgramId(format!("{}", e)))?;
-
+        info!("program_id: {}", program_id);
         Ok(Self {
             client,
             program_id,

@@ -44,6 +44,7 @@ docs
 
 /backend/target
 /backend/Cargo.lock
+/backend/logs/**
 
 /contract/.anchor
 /contract/.DS_Store

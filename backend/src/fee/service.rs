@@ -9,7 +9,7 @@ use crate::{
 };
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use solana_sdk::{pubkey::Pubkey, signature::Signer, system_program};
+use solana_sdk::{signature::Signer, system_program};
 
 /// 初始化费用
 pub fn init_fee(client: &ChainClient) -> Result<()> {

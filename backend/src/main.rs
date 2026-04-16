@@ -1,6 +1,3 @@
-use crate::chain::client::ChainClient;
-use crate::{config::Config, error::Error};
-
 mod api;
 mod auth;
 mod chain;
@@ -9,12 +6,15 @@ mod constants;
 mod core;
 mod error;
 mod fee;
-mod log;
 mod utils;
 
+use crate::chain::client::ChainClient;
+use crate::config::log_config::log_config;
+use crate::{config::env_config::Config, error::Error};
 use crate::error::Result;
 
 fn main() -> Result<()> {
+    let _ = log_config();
     let config = Config::from_env().map_err(|e| Error::ConfigError("()".to_string()))?;
     println!("{:?}", config);
     let client = ChainClient::new(&config)?;

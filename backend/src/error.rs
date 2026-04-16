@@ -15,6 +15,7 @@ pub enum Error {
     ProgramIdError(String),
     PayerKeypairError(String),
     PubKeyError,
+    LogError(String),
 }
 
 impl Display for Error {
@@ -28,6 +29,7 @@ impl Display for Error {
             Error::ProgramIdError(msg) => write!(f, "Program Id 错误: {msg}"),
             Error::PayerKeypairError(msg) => write!(f, "Payer Keypair 错误: {msg}"),
             Error::PubKeyError => write!(f, "Pubkey 错误"),
+            Error::LogError(msg) => write!(f, "Log 错误: {msg}"),
         }
     }
 }

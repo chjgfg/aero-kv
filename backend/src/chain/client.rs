@@ -3,7 +3,7 @@
 use std::str::FromStr;
 
 use crate::{
-    config::Config,
+    config::env_config::Config,
     error::{Error, Result},
 };
 use anchor_client::{Client, Cluster, Program};

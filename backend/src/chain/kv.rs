@@ -9,10 +9,9 @@ use crate::{
     constants::{AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
     error::{Error, Result},
 };
-use anchor_client::anchor_lang::solana_program::info;
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use solana_sdk::{pubkey::Pubkey, signature::Signer, system_program};
+use solana_sdk::{signature::Signer, system_program};
 
 /// 初始化存储
 pub fn init_storage(client: &ChainClient) -> Result<()> {
@@ -84,7 +83,7 @@ pub fn delete(client: &ChainClient, key: Vec<u8>) -> Result<()> {
         system_program: system_program::ID,
     };
     let args = instruction::Delete { key };
-    let res = program
+    let _res = program
         .request()
         .args(args)
         .accounts(accounts)

@@ -49,6 +49,13 @@ async fn main() -> Result<()> {
         // 手续费接口
         .route("/fee/init-fee", post(api::init_fee))
         .route("/fee/set-fee", post(api::set_fee))
+            // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
+    .layer(
+        CorsLayer::new()
+            .allow_origin(axum::http::header::Origin::any())
+            .allow_methods(axum::http::Method::any())
+            .allow_headers(axum::http::header::HeaderName::any()),
+    )
         // 注入状态（Arc<ChainClient>）
         .with_state(state);
 

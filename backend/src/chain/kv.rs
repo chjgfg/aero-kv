@@ -15,11 +15,11 @@ use solana_sdk::{signature::Signer, system_program};
 
 impl ChainClient {
     /// 初始化存储
-    pub fn init_storage(&self, client: &ChainClient) -> Result<()> {
-        let program = client.program()?;
-        let (meta_pda, _) = client.find_pda(META_SEEDS);
-        let (head_pda, _) = client.find_pda(HEAD_SEEDS);
-        let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    pub async fn init_storage(&self) -> Result<()> {
+        let program = self.program()?;
+        let (meta_pda, _) = self.find_pda(META_SEEDS);
+        let (head_pda, _) = self.find_pda(HEAD_SEEDS);
+        let admin = self.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
         let accounts = accounts::InitStorage {
             signer: admin,
             meta: meta_pda,
@@ -36,7 +36,7 @@ impl ChainClient {
     }
 
     /// 插入或者修改
-    pub fn upsert(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
+    pub async fn upsert(&self, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         let program = self.program()?;
         let (meta_pda, _) = self.find_pda(META_SEEDS);
         let (node_pda, _) = self.find_pda(&[NODE_SEEDS, key.as_slice()]);
@@ -65,14 +65,14 @@ impl ChainClient {
     }
 
     /// 删除
-    pub fn delete(&self, client: &ChainClient, key: Vec<u8>) -> Result<()> {
-        let program = client.program()?;
-        let (meta_pda, _) = client.find_pda(META_SEEDS);
-        let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
-        let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
-        let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-        let (fee_pda, _) = client.find_pda(FEE_SEEDS);
-        let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    pub async fn delete(&self, key: Vec<u8>) -> Result<()> {
+        let program = self.program()?;
+        let (meta_pda, _) = self.find_pda(META_SEEDS);
+        let (node_pda, _) = self.find_pda(&[NODE_SEEDS, key.as_slice()]);
+        let (value_pda, _) = self.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+        let (auth_pda, _) = self.find_pda(AUTH_SEEDS);
+        let (fee_pda, _) = self.find_pda(FEE_SEEDS);
+        let admin = self.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
         let accounts = accounts::Delete {
             signer: admin,
             meta: meta_pda,
@@ -94,13 +94,13 @@ impl ChainClient {
         Ok(())
     }
 
-    pub fn get(&self, client: &ChainClient, key: Vec<u8>) -> Result<()> {
-        let program = client.program()?;
-        let (meta_pda, _) = client.find_pda(META_SEEDS);
-        let (head_pda, _) = client.find_pda(HEAD_SEEDS);
-        let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
-        let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
-        let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    pub async fn get(&self, key: Vec<u8>) -> Result<()> {
+        let program = self.program()?;
+        let (meta_pda, _) = self.find_pda(META_SEEDS);
+        let (head_pda, _) = self.find_pda(HEAD_SEEDS);
+        let (node_pda, _) = self.find_pda(&[NODE_SEEDS, key.as_slice()]);
+        let (value_pda, _) = self.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+        let (auth_pda, _) = self.find_pda(AUTH_SEEDS);
         let accounts = accounts::Get {
             meta: meta_pda,
             head: head_pda,
@@ -118,12 +118,12 @@ impl ChainClient {
         Ok(())
     }
 
-    pub fn scan(&self, client: &ChainClient, start: Vec<u8>, limit: u64) -> Result<()> {
-        let program = client.program()?;
-        let (meta_pda, _) = client.find_pda(META_SEEDS);
-        let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-        let (fee_pda, _) = client.find_pda(FEE_SEEDS);
-        let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    pub async fn scan(&self, start: Vec<u8>, limit: u64) -> Result<()> {
+        let program = self.program()?;
+        let (meta_pda, _) = self.find_pda(META_SEEDS);
+        let (auth_pda, _) = self.find_pda(AUTH_SEEDS);
+        let (fee_pda, _) = self.find_pda(FEE_SEEDS);
+        let admin = self.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
         let accounts = accounts::Scan {
             signer: admin,
             meta: meta_pda,

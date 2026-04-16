@@ -25,7 +25,7 @@ impl ChainClient {
         // let payer = Arc::new(Keypair::from_base58_string(config.payer_keypair.as_str()));
         let key_bytes = parse_keypair_array(config.payer_keypair.as_str())?;
         let payer = Arc::new(Keypair::from_bytes(&key_bytes).map_err(|_| Error::InvalidKey)?); // 用 from_bytes 解析数组
-        info!("payer: {:?}", payer);
+        // info!("payer: {:?}", payer);
         // 2. 这里的 .clone() 只是拷贝了智能指针，符合 Client<C: Clone> 的要求
         let payer_for_client = payer.clone();
         let cluster = Cluster::Custom(config.rpc_url.clone(), config.rpc_url.clone());

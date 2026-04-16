@@ -1,0 +1,52 @@
+"use client";
+
+import { useWallet } from "@solana/wallet-adapter-react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useRouter } from "next/navigation";
+
+export default function LoginPage() {
+    const { connected, publicKey, disconnect } = useWallet();
+    const router = useRouter();
+
+    return (
+        <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center px-4">
+            <div className="w-full max-w-md bg-[#1e293b] rounded-2xl p-8 shadow-xl">
+                <h1 className="text-3xl font-bold text-center text-blue-400 mb-2">
+                    Aero KV 管理后台
+                </h1>
+                <p className="text-gray-400 text-center mb-8">
+                    连接 Solana 钱包即可登录
+                </p>
+
+                <div className="flex justify-center mb-6">
+                    <WalletMultiButton />
+                </div>
+
+                {connected && publicKey && (
+                    <div className="space-y-4">
+                        <div className="p-4 bg-gray-800 rounded-lg text-center">
+                            <p className="text-sm text-gray-400">已连接钱包</p>
+                            <p className="text-cyan-300 font-mono text-sm break-all">
+                                {publicKey.toBase58()}
+                            </p>
+                        </div>
+
+                        <button
+                            onClick={() => router.push("/dashboard")}
+                            className="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-semibold transition"
+                        >
+                            进入管理后台
+                        </button>
+
+                        <button
+                            onClick={disconnect}
+                            className="w-full py-3 text-gray-400 hover:text-white text-sm transition"
+                        >
+                            断开连接
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}

@@ -9,6 +9,7 @@ use crate::{
     constants::{AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
     error::{Error, Result},
 };
+use anchor_client::anchor_lang::solana_program::info;
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
 use solana_sdk::{pubkey::Pubkey, signature::Signer, system_program};
@@ -34,12 +35,12 @@ pub fn init_storage(client: &ChainClient) -> Result<()> {
     Ok(())
 }
 
-/// 重置权限
+/// 插入或者修改
 pub fn upsert(client: &ChainClient, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
     let program = client.program()?;
     let (meta_pda, _) = client.find_pda(META_SEEDS);
-    let (node_pda, _) = client.find_pda(NODE_SEEDS);
-    let (value_pda, _) = client.find_pda(VALUE_SEEDS);
+    let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
     let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
@@ -60,5 +61,82 @@ pub fn upsert(client: &ChainClient, key: Vec<u8>, value: Vec<u8>) -> Result<()> 
         .accounts(accounts)
         .send()
         .map_err(|e| Error::RpcError(format!("upsert 失败: {e}")))?;
+    Ok(())
+}
+
+/// 删除
+pub fn delete(client: &ChainClient, key: Vec<u8>) -> Result<()> {
+    let program = client.program()?;
+    let (meta_pda, _) = client.find_pda(META_SEEDS);
+    let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    let (fee_pda, _) = client.find_pda(FEE_SEEDS);
+    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    let accounts = accounts::Delete {
+        signer: admin,
+        meta: meta_pda,
+        target: node_pda,
+        value_account: value_pda,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: system_program::ID,
+        system_program: system_program::ID,
+    };
+    let args = instruction::Delete { key };
+    let res = program
+        .request()
+        .args(args)
+        .accounts(accounts)
+        .send()
+        .map_err(|e| Error::RpcError(format!("delete 失败: {e}")))?;
+    // info!("res:{}", res);
+    Ok(())
+}
+
+pub fn get(client: &ChainClient, key: Vec<u8>) -> Result<()> {
+    let program = client.program()?;
+    let (meta_pda, _) = client.find_pda(META_SEEDS);
+    let (head_pda, _) = client.find_pda(HEAD_SEEDS);
+    let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    let accounts = accounts::Get {
+        meta: meta_pda,
+        head: head_pda,
+        target: node_pda,
+        auth_config: auth_pda,
+        value_account: value_pda,
+    };
+    let args = instruction::Get { key };
+    program
+        .request()
+        .args(args)
+        .accounts(accounts)
+        .send()
+        .map_err(|e| Error::RpcError(format!("get 失败: {e}")))?;
+    Ok(())
+}
+
+pub fn scan(client: &ChainClient, start: Vec<u8>, limit: u64) -> Result<()> {
+    let program = client.program()?;
+    let (meta_pda, _) = client.find_pda(META_SEEDS);
+    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    let (fee_pda, _) = client.find_pda(FEE_SEEDS);
+    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    let accounts = accounts::Scan {
+        signer: admin,
+        meta: meta_pda,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: system_program::ID,
+    };
+    let args = instruction::Scan { start, limit };
+    program
+        .request()
+        .args(args)
+        .accounts(accounts)
+        .send()
+        .map_err(|e| Error::RpcError(format!("scan 失败: {e}")))?;
     Ok(())
 }

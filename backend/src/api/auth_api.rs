@@ -8,7 +8,7 @@ use log::info;
 use solana_sdk::pubkey::Pubkey;
 use std::str::FromStr;
 
-use crate::AppState;
+use crate::{AppState, auth};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AuthQuery {
@@ -19,7 +19,7 @@ pub struct AuthQuery {
 // 权限接口示例
 pub async fn init_auth(State(client): State<AppState>) -> impl IntoResponse {
     info!("init auth");
-    let _ = client.init_auth().await;
+    let _ = auth::init_auth(client).await;
     (StatusCode::OK, "init auth success")
 }
 
@@ -29,7 +29,7 @@ pub async fn set_admin(
 ) -> impl IntoResponse {
     info!("set admin new_admin: {}", req.new_admin);
     let pubkey = Pubkey::from_str(req.new_admin.as_str()).unwrap();
-    let _ = client.set_admin(pubkey).await;
+    let _ = auth::set_admin(client, pubkey).await;
     (StatusCode::OK, "set admin success")
 }
 
@@ -38,6 +38,6 @@ pub async fn set_pause(
     Query(req): Query<AuthQuery>,
 ) -> impl IntoResponse {
     info!("set pause paused: {}", req.paused);
-    let _ = client.set_pause(req.paused).await;
+    let _ = auth::set_pause(client, req.paused).await;
     (StatusCode::OK, "set pause success")
 }

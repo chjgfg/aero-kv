@@ -8,13 +8,16 @@ use std::sync::Arc;
 
 use crate::{
     chain::client::ChainClient,
-    constants::{AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
+    constants::{
+        AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS,
+    },
     error::{Error, Result},
 };
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
 use log::info;
 use solana_sdk::{
+    instruction::AccountMeta,
     pubkey::Pubkey,
     signature::{Keypair, Signature, Signer},
     system_program,
@@ -42,7 +45,7 @@ pub async fn init_storage(client: Arc<ChainClient>) -> Result<()> {
     })
     .await
     .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?; // 处理任务 panic
-    info!("upsert 成功，签名: {}", signature?);
+    info!("init storage 成功，签名: {}", signature?);
     Ok(())
 }
 
@@ -50,13 +53,22 @@ pub async fn init_storage(client: Arc<ChainClient>) -> Result<()> {
 pub async fn upsert(client: Arc<ChainClient>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
     info!("upsert key: {:?}, value: {:?}", key, value);
     let (meta_pda, _) = client.find_pda(META_SEEDS);
+    info!("Meta PDA: {}", meta_pda);
     let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    info!("Node PDA: {}", node_pda);
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("Value PDA: {}", value_pda);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    info!("Auth PDA: {}", auth_pda);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
-    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+    info!("Fee PDA: {}", fee_pda);
+    let (head_pda, _) = client.find_pda(HEAD_SEEDS);
+    info!("Head PDA: {}", head_pda);
+    let admin = client.payer.pubkey();
+    info!("Signer: {}", admin);
     let treasury = Keypair::new();
     let treasury_pubkey = treasury.pubkey();
+    info!("Treasury: {}", treasury_pubkey);
     let accounts = accounts::Upsert {
         signer: admin,
         meta: meta_pda,
@@ -72,11 +84,16 @@ pub async fn upsert(client: Arc<ChainClient>, key: Vec<u8>, value: Vec<u8>) -> R
     // 3. 🔥 核心修复：把同步阻塞调用放到 tokio::task::spawn_blocking 里
     let signature_result = tokio::task::spawn_blocking(move || {
         let program = client.program()?;
+        // 重点：在这里手动添加剩余账户
+        // const MAX_LEVEL: usize = 8; // 必须和合约一致
+        let remaining_metas: Vec<AccountMeta> = (0..MAX_LEVEL)
+            .map(|_| AccountMeta::new(head_pda, false)) // true = is_writable, false = is_signer
+            .collect();
         let sig = program
             .request()
             .args(args)
             .accounts(accounts)
-            .remaining_accounts(&[])
+            .accounts(remaining_metas)
             .send()
             .map_err(|e| {
                 // 这里直接打印错误

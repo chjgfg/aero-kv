@@ -1,2 +1,4 @@
 pub mod service;
 pub mod types;
+
+pub use service::{init_fee, set_fee};

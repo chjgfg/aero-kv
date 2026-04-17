@@ -1,7 +1,12 @@
 use anchor_lang::prelude::*;
 
 use crate::{
-    auth::structs::AuthConfig, constants::{AUTH_SEEDS, FEE_SEEDS, MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS}, error::Error, fee::FeeConfig, storage::structs::{SkipListMeta, SkipNode, ValueAccount}, utils::charge
+    auth::structs::AuthConfig,
+    constants::{AUTH_SEEDS, FEE_SEEDS, MAX_LEVEL, META_SEEDS, NODE_SEEDS, VALUE_SEEDS},
+    error::Error,
+    fee::FeeConfig,
+    storage::structs::{SkipListMeta, SkipNode, ValueAccount},
+    utils::charge,
 };
 
 #[derive(Accounts)]
@@ -29,7 +34,7 @@ pub struct Delete<'info> {
 
     #[account(seeds = [AUTH_SEEDS], bump)]
     pub auth_config: Account<'info, AuthConfig>,
-    
+
     #[account(seeds = [FEE_SEEDS], bump)]
     pub fee_config: Account<'info, FeeConfig>,
 
@@ -42,7 +47,7 @@ pub struct Delete<'info> {
 pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
-    
+
     // 2️⃣ 收费（删除只收基础费）
     let fee = ctx.accounts.fee_config.base_fee;
 
@@ -84,6 +89,9 @@ pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
             let mut writer = &mut prev_data[8..];
             prev.serialize(&mut writer)?;
         }
+        // 🔥 关键修复：在这里手动释放借用
+        // 这样下次循环开始时，同一个账户就可以被重新借用
+        drop(prev_data);
     }
 
     // ✅ 正确关闭

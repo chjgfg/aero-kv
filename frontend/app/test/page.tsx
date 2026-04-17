@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, } from "../../utils/http.ts";
+import { health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets } from "../../utils/http.ts";
 
 // 这里假设你把刚才的 http.ts 函数都放在了 @/lib/api 中，或者直接写在这个文件上方
 // 为了演示方便，我这里直接引用你定义的函数名

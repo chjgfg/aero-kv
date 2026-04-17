@@ -24,7 +24,7 @@ pub struct Scan<'info> {
 
     #[account(seeds = [AUTH_SEEDS], bump)]
     pub auth_config: Account<'info, AuthConfig>,
-    
+
     #[account(seeds = [FEE_SEEDS], bump)]
     pub fee_config: Account<'info, FeeConfig>,
 

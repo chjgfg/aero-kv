@@ -6,7 +6,7 @@ mod fee;
 mod storage;
 mod utils;
 
-declare_id!("ErsBN7qXZ8GX9U5FBYiHFx7oGeWfcmJCbr8dgFCfNZ1z");
+declare_id!("9nrYAtQiF9dNRBxLwSfq4V5wdWB7Ux5oooTRZuBwBa6o");
 
 #[program]
 pub mod contract {

@@ -128,7 +128,7 @@ const deleted = async (key: string) => {
 
 const gets = async (key: string) => {
     // 将参数拼接到 URL 后面
-    const url = `http://192.168.40.131/kv/get?new_admin=${key}`;
+    const url = `http://192.168.40.131/kv/get?key=${key}`;
     const res = await fetch(url);
     const data = await res.json();
     return data;
@@ -159,5 +159,5 @@ const scan = async (key: string, limit: number) => {
 // ----------------------------------------------------------------------------------------------------------------------------------
 
 export {
-    health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan,
+    health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets
 }

@@ -45,6 +45,8 @@ pub struct Delete<'info> {
 }
 
 pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
+    msg!("Node PDA: {:?}", ctx.accounts.target.key());
+    msg!("Value PDA: {:?}", ctx.accounts.value_account.key());
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
 

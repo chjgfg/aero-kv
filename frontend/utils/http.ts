@@ -91,7 +91,7 @@ const initStorage = async () => {
     return data;
 }
 
-const upsert = async (key: string, value: string, limit: number) => {
+const upsert = async (key: string, value: string) => {
     const res = await fetch("http://192.168.40.131/kv/upsert", {
         method: "POST", // 必须是 POST，因为你的后端路由是这么定义的
         headers: {
@@ -101,7 +101,7 @@ const upsert = async (key: string, value: string, limit: number) => {
         body: JSON.stringify({
             key: key,
             value: value,
-            limit: limit,
+            limit: 0,
         }),
     });
 

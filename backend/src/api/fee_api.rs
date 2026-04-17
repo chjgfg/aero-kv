@@ -2,7 +2,7 @@
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use log::info;
 
-use crate::{AppState, chain, fee};
+use crate::{AppState, fee};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FeeRequest {

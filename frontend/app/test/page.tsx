@@ -78,7 +78,7 @@ export default function AdminDashboard() {
                             <input type="number" placeholder="Limit" value={kvLimit} onChange={(e) => setKvLimit(Number(e.target.value))} style={{ ...inputStyle, width: '80px' }} />
                         </div>
                         <div style={btnGroupStyle}>
-                            <button onClick={() => handleAction("写入(Upsert)", () => upsert(kvKey, kvValue, kvLimit))}>写入数据</button>
+                            <button onClick={() => handleAction("写入(Upsert)", () => upsert(kvKey, kvValue))}>写入数据</button>
                             <button onClick={() => handleAction("查询(Get)", () => gets(kvKey))}>单点查询</button>
                             <button onClick={() => handleAction("范围扫描(Scan)", () => scan(kvKey, kvLimit))}>范围扫描</button>
                             <button onClick={() => handleAction("删除(Delete)", () => deleted(kvKey))} style={{ backgroundColor: '#ff4d4f' }}>删除Key</button>

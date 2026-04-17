@@ -55,22 +55,22 @@ pub async fn init_storage(client: Arc<ChainClient>) -> Result<()> {
 pub async fn upsert(client: Arc<ChainClient>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
     info!("upsert key: {:?}, value: {:?}", key, value);
     let (meta_pda, _) = client.find_pda(META_SEEDS);
-    info!("Meta PDA: {}", meta_pda);
+    // info!("Meta PDA: {}", meta_pda);
     let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
     info!("Node PDA: {}", node_pda);
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
     info!("Value PDA: {}", value_pda);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-    info!("Auth PDA: {}", auth_pda);
+    // info!("Auth PDA: {}", auth_pda);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
-    info!("Fee PDA: {}", fee_pda);
+    // info!("Fee PDA: {}", fee_pda);
     let (head_pda, _) = client.find_pda(HEAD_SEEDS);
-    info!("Head PDA: {}", head_pda);
+    // info!("Head PDA: {}", head_pda);
     let admin = client.payer.pubkey();
-    info!("Signer: {}", admin);
+    // info!("Signer: {}", admin);
     let treasury = Keypair::new();
     let treasury_pubkey = treasury.pubkey();
-    info!("Treasury: {}", treasury_pubkey);
+    // info!("Treasury: {}", treasury_pubkey);
     let accounts = accounts::Upsert {
         signer: admin,
         meta: meta_pda,
@@ -146,15 +146,17 @@ pub async fn delete(client: Arc<ChainClient>, key: Vec<u8>) -> Result<()> {
     info!("delete key: {:?}", key);
     let (meta_pda, _) = client.find_pda(META_SEEDS);
     let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    info!("Node PDA: {}", node_pda);
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("Value PDA: {}", value_pda);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
     let (head_pda, _) = client.find_pda(HEAD_SEEDS);
-    info!("Head PDA: {}", head_pda);
+    // info!("Head PDA: {}", head_pda);
     let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let treasury = Keypair::new();
     let treasury_pubkey = treasury.pubkey();
-    info!("Treasury: {}", treasury_pubkey);
+    // info!("Treasury: {}", treasury_pubkey);
     let accounts = accounts::Delete {
         signer: admin,
         meta: meta_pda,
@@ -200,12 +202,17 @@ pub async fn delete(client: Arc<ChainClient>, key: Vec<u8>) -> Result<()> {
 }
 
 pub async fn get(client: Arc<ChainClient>, key: Vec<u8>) -> Result<Json<Value>> {
-    info!("get key: {:?}", key);
+    info!("backend get key: {:?}", key);
     let (meta_pda, _) = client.find_pda(META_SEEDS);
+    info!("backend get mete pda: {}", meta_pda);
     let (head_pda, _) = client.find_pda(HEAD_SEEDS);
+    info!("backend get head pda: {}", head_pda);
     let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
+    info!("backend get node pda: {}", node_pda);
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("backend get value pda: {}", value_pda);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
+    info!("backend get auth pda: {}", auth_pda);
     let accounts = accounts::Get {
         meta: meta_pda,
         head: head_pda,
@@ -277,6 +284,7 @@ pub async fn scan(client: Arc<ChainClient>, start: Vec<u8>, limit: u64) -> Resul
     let (meta_pda, _) = client.find_pda(META_SEEDS);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
+    let (head_pda, _) = client.find_pda(HEAD_SEEDS);
     let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::Scan {
         signer: admin,
@@ -286,17 +294,31 @@ pub async fn scan(client: Arc<ChainClient>, start: Vec<u8>, limit: u64) -> Resul
         treasury: system_program::ID,
     };
     let args = instruction::Scan { start, limit };
-    let signature = tokio::task::spawn_blocking(move || {
+    let signature_result = tokio::task::spawn_blocking(move || {
         let program = client.program()?;
+        let remaining_accounts_vec: Vec<AccountMeta> = (0..MAX_LEVEL)
+            .map(|_| AccountMeta::new(head_pda, false))
+            .collect();
         program
             .request()
             .args(args)
             .accounts(accounts)
+            .accounts(remaining_accounts_vec)
             .send()
             .map_err(|e| Error::RpcError(format!("scan 失败: {e}")))
     })
-    .await
-    .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?; // 处理任务 panic
-    info!("scan 成功，签名: {}", signature?);
+    .await; // 处理任务 panic
+    let signature = match signature_result {
+        Ok(Ok(res)) => res,
+        Ok(Err(e)) => {
+            log::error!("交易执行失败: {:?}", e);
+            return Err(e);
+        }
+        Err(e) => {
+            log::error!("spawn_blocking 任务失败: {:?}", e);
+            return Err(Error::RpcError(format!("任务执行失败: {e}")));
+        }
+    };
+    info!("scan 成功，签名: {}", signature);
     Ok(())
 }

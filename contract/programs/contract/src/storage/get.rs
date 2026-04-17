@@ -17,7 +17,10 @@ pub struct Get<'info> {
     #[account(seeds=[HEAD_SEEDS], bump)]
     pub head: Account<'info, SkipNode>,
 
-    #[account(seeds=[NODE_SEEDS, key.as_slice()], bump)]
+    #[account(
+        seeds=[NODE_SEEDS, key.as_slice()], 
+        bump
+    )]
     pub target: Account<'info, SkipNode>,
 
     #[account(seeds = [AUTH_SEEDS], bump)]

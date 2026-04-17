@@ -29,7 +29,7 @@ pub struct InitStorage<'info> {
 }
 
 pub fn init_storage(ctx: Context<InitStorage>) -> Result<()> {
-    msg!("Greetings from: {:?}", ctx.program_id);
+    // msg!("Greetings from: {:?}", ctx.program_id);
     let meta = &mut ctx.accounts.meta;
     let head = &mut ctx.accounts.head;
 

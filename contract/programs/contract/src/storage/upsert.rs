@@ -56,8 +56,13 @@ pub struct Upsert<'info> {
 /// 需要通过 remaining_accounts 传入“沿途会被更新 forward 的节点账户”
 /// 顺序：从高层到低层的 prev 节点（长度 = MAX_LEVEL，找不到就传 head）
 pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-    msg!("Node PDA: {:?}", ctx.accounts.new_node.key());
-    msg!("Value PDA: {:?}", ctx.accounts.value_account.key());
+    msg!("contract upsert key: {:?}, value: {:?}", key, value);
+    msg!("contract upsert meta pda: {:?}", ctx.accounts.meta.key());
+    msg!("contract upsert node pda: {:?}", ctx.accounts.new_node.key());
+    msg!("contract upsert value pda: {:?}", ctx.accounts.value_account.key());
+    msg!("contract upsert auth pda: {:?}", ctx.accounts.auth_config.key());
+    msg!("contract upsert fee pda: {:?}", ctx.accounts.fee_config.key());
+
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
 

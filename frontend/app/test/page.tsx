@@ -1,15 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets } from "../../utils/http.ts";
-
-// 这里假设你把刚才的 http.ts 函数都放在了 @/lib/api 中，或者直接写在这个文件上方
-// 为了演示方便，我这里直接引用你定义的函数名
 
 export default function AdminDashboard() {
     const [logs, setLogs] = useState<string[]>([]);
-
-    // 输入框状态管理
     const [adminAddress, setAdminAddress] = useState("");
     const [kvKey, setKvKey] = useState("");
     const [kvValue, setKvValue] = useState("");
@@ -18,31 +13,54 @@ export default function AdminDashboard() {
     const [feePerByte, setFeePerByte] = useState(1);
     const [feeScan, setFeeScan] = useState(10);
 
-    // 日志打印工具
+    // 日志打印
     const addLog = (msg: string) => {
         setLogs(prev => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 19)]);
     };
 
-    // 统一处理 API 调用
+    // 统一 API 调用
     const handleAction = async (name: string, apiFunc: () => Promise<any>) => {
         try {
             addLog(`正在执行: ${name}...`);
             const result = await apiFunc();
             addLog(`✅ ${name} 成功: ${JSON.stringify(result)}`);
+            return true;
         } catch (err: any) {
             addLog(`❌ ${name} 失败: ${err.message}`);
+            return false;
         }
     };
+
+    // ==============================================
+    // 🔥 页面加载自动执行：initAuth → initFee → initStorage
+    // ==============================================
+    useEffect(() => {
+        const autoInit = async () => {
+            addLog("📦 页面加载完成，开始自动初始化...");
+            
+            // 按顺序执行，必须前一个成功才执行下一个
+            const authOk = await handleAction("初始化权限", initAuth);
+            // if (!authOk) return;
+
+            const feeOk = await handleAction("初始化费用", initFee);
+            // if (!feeOk) return;
+
+            const storageOk = await handleAction("初始化存储", initStorage);
+            // if (storageOk) {
+            //     addLog("✅ 所有初始化任务执行完成！");
+            // }
+        };
+
+        // 进入页面立即执行一次
+        autoInit();
+    }, []); // 空依赖 = 只执行一次
 
     return (
         <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto', fontFamily: 'sans-serif' }}>
             <h1 style={{ borderBottom: '2px solid #333' }}>DiamondDB 管理控制台</h1>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-
-                {/* 左侧：操作面板 */}
                 <div>
-                    {/* 初始化区域 */}
                     <section style={sectionStyle}>
                         <h3>🚀 系统初始化 (依次执行)</h3>
                         <div style={btnGroupStyle}>
@@ -53,7 +71,6 @@ export default function AdminDashboard() {
                         </div>
                     </section>
 
-                    {/* 权限管理 */}
                     <section style={sectionStyle}>
                         <h3>🔐 权限控制</h3>
                         <input
@@ -69,7 +86,6 @@ export default function AdminDashboard() {
                         </div>
                     </section>
 
-                    {/* KV 存储操作 */}
                     <section style={sectionStyle}>
                         <h3>📦 KV 存储操作 (SkipList)</h3>
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
@@ -85,7 +101,6 @@ export default function AdminDashboard() {
                         </div>
                     </section>
 
-                    {/* 手续费设置 */}
                     <section style={sectionStyle}>
                         <h3>💰 手续费配置</h3>
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
@@ -97,7 +112,6 @@ export default function AdminDashboard() {
                     </section>
                 </div>
 
-                {/* 右侧：实时日志 */}
                 <div>
                     <section style={{ ...sectionStyle, height: '100%', backgroundColor: '#1e1e1e', color: '#00ff00' }}>
                         <h3>📡 实时运行日志</h3>
@@ -106,13 +120,11 @@ export default function AdminDashboard() {
                         </div>
                     </section>
                 </div>
-
             </div>
         </div>
     );
 }
 
-// --- 样式定义 ---
 const sectionStyle: React.CSSProperties = {
     border: '1px solid #ddd',
     padding: '15px',

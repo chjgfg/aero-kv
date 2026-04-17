@@ -53,18 +53,19 @@ pub async fn init_storage(client: Arc<ChainClient>) -> Result<()> {
 
 /// 插入或者修改
 pub async fn upsert(client: Arc<ChainClient>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
-    info!("upsert key: {:?}, value: {:?}", key, value);
+    info!("backend upsert key: {:?}, value: {:?}", key, value);
     let (meta_pda, _) = client.find_pda(META_SEEDS);
-    // info!("Meta PDA: {}", meta_pda);
+    info!("backend upsert mete pda: {}", meta_pda);
     let (node_pda, _) = client.find_pda(&[NODE_SEEDS, key.as_slice()]);
-    info!("Node PDA: {}", node_pda);
+    info!("backend upsert node pda: {}", node_pda);
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
-    info!("Value PDA: {}", value_pda);
+    info!("backend upsert value pda: {}", value_pda);
     let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-    // info!("Auth PDA: {}", auth_pda);
+    info!("backend upsert auth pda: {}", auth_pda);
     let (fee_pda, _) = client.find_pda(FEE_SEEDS);
-    // info!("Fee PDA: {}", fee_pda);
+    info!("backend upsert fee pda: {}", fee_pda);
     let (head_pda, _) = client.find_pda(HEAD_SEEDS);
+    info!("backend upsert head pda: {}", head_pda);
     // info!("Head PDA: {}", head_pda);
     let admin = client.payer.pubkey();
     // info!("Signer: {}", admin);

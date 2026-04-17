@@ -12,10 +12,11 @@ use crate::{
     error::{Error, Result},
 };
 use anchor_client::anchor_lang::prelude::borsh::BorshDeserialize;
+
 use axum::Json;
-use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use log::info;
+use contract::{accounts, contract::KVEvent}; // 👈 用你的合约名
+use log::{info};
 use once_cell::sync::Lazy;
 use serde_json::{Value, json};
 use solana_sdk::{instruction::AccountMeta, signature::Signer, system_program};
@@ -85,10 +86,13 @@ pub async fn upsert(client: Arc<ChainClient>, key: Vec<u8>, value: Vec<u8>) -> R
     // ==============================
     // 🔥 后端维护 key：upsert 时插入
     // ==============================
-    let mut keys = GLOBAL_KEYS.lock().unwrap();
-    if !keys.contains(&key) {
-        keys.push(key.clone());
-    }
+    {
+        // 这对大括号是关键！锁只在里面有效，执行完立刻释放
+        let mut keys = GLOBAL_KEYS.lock().unwrap();
+        if !keys.contains(&key) {
+            keys.push(key.clone());
+        }
+    } // 离开这个块，keys 被 drop，锁被释放
 
     // 只保留合约真正需要的 PDA
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
@@ -242,8 +246,11 @@ pub async fn delete(client: Arc<ChainClient>, key: Vec<u8>) -> Result<()> {
     // ==============================
     // 🔥 后端维护 key：delete 时移除
     // ==============================
-    let mut keys = GLOBAL_KEYS.lock().unwrap();
-    keys.retain(|k| k != &key);
+    // 🔥 同样的方法，把锁的代码放到同步块里
+    {
+        let mut keys = GLOBAL_KEYS.lock().unwrap();
+        keys.retain(|k| k != &key);
+    }
 
     let (value_pda, _) = client.find_pda(&[VALUE_SEEDS, key.as_slice()]);
     info!("backend delete value pda: {}", value_pda);
@@ -389,5 +396,52 @@ pub async fn scan(client: Arc<ChainClient>, start: Vec<u8>, limit: u64) -> Resul
         }
     };
     info!("scan 交易成功: {}", signature);
+
+    // ==============================
+    // 🔥 直接用同步方式获取日志，不用 .await
+    // ==============================
+    // 注意：这里我们用 spawn_blocking 包裹同步 RPC 调用
+
+    // ==============================
+    // 🔥 用 solana-cli 命令行解析日志，100% 不依赖 Rust 类型
+    // ==============================
+    let logs = tokio::task::spawn_blocking(move || {
+        let output = std::process::Command::new("solana")
+            .arg("logs")
+            .arg(&signature.to_string())
+            .output()?;
+
+        if !output.status.success() {
+            return Err(Error::RpcError("获取交易日志失败".to_string()));
+        }
+
+        let logs = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+
+        Ok(logs)
+    })
+    .await
+    .map_err(|e| Error::ParseEmitError(e.to_string()))??;
+
+    // 3. 解析日志里的 KVEvent
+    let mut results = Vec::new();
+    for log in logs {
+        if log.starts_with("Program data: ") {
+            info!("log: {:?}", log);
+            let data = log.replace("Program data: ", "");
+            let bytes = base64::decode(&data).unwrap_or_default();
+            if bytes.len() > 8 {
+                if let Ok(event) = KVEvent::try_from_slice(&bytes[8..]) {
+                    info!("✅ 解析成功 -> key: {:?}, value: {:?}", event.key, event.value);
+                    results.push((event.key, event.value));
+                }
+            }
+        }
+    }
+
+    info!("扫描完成，共 {} 条数据", results.len());
+
     Ok(())
 }

@@ -29,5 +29,5 @@ log = "0.4.20"
 time = { version = "0.3", features = ["macros", "local-offset"] }
 
 once_cell = "1.21.4"
-
+base64 = "0.22.1"
 bs58 = { version = "0.5", features = ["check"] }

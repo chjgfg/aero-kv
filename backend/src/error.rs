@@ -19,6 +19,7 @@ pub enum Error {
     ServerPortError(String),
     IoError(String),
     TreasuryError(String),
+    ParseEmitError(String),
 }
 
 impl Display for Error {
@@ -36,6 +37,7 @@ impl Display for Error {
             Error::ServerPortError(msg) => write!(f, "服务端口 错误: {msg}"),
             Error::IoError(msg) => write!(f, "IO 错误: {msg}"),
             Error::TreasuryError(msg) => write!(f, "Treasury 错误: {msg}"),
+            Error::ParseEmitError(msg) => write!(f, "解析 Emit 错误: {msg}"),
         }
     }
 }

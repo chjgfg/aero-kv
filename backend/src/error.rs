@@ -18,6 +18,7 @@ pub enum Error {
     InvalidKey,
     ServerPortError(String),
     IoError(String),
+    TreasuryError(String),
 }
 
 impl Display for Error {
@@ -34,6 +35,7 @@ impl Display for Error {
             Error::InvalidKey => write!(f, "无效的 Key"),
             Error::ServerPortError(msg) => write!(f, "服务端口 错误: {msg}"),
             Error::IoError(msg) => write!(f, "IO 错误: {msg}"),
+            Error::TreasuryError(msg) => write!(f, "Treasury 错误: {msg}"),
         }
     }
 }

@@ -1,5 +1,9 @@
 // # 链交互模块（对应合约 storage）
 
+use std::str::FromStr;
+
+use solana_sdk::pubkey::Pubkey;
+
 use crate::error::{Error, Result};
 
 pub fn parse_keypair_array(s: &str) -> Result<Vec<u8>> {

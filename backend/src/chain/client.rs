@@ -20,6 +20,7 @@ pub struct ChainClient {
     pub rpc_client: Arc<RpcClient>, // 🔥 关键：新增 RpcClient 字段
     pub program_id: Pubkey,
     pub payer: Arc<Keypair>,
+    pub treasury: Pubkey,
 }
 
 impl ChainClient {
@@ -41,11 +42,14 @@ impl ChainClient {
         // 2. 创建 RpcClient（同步，可在 spawn_blocking 中使用）
         let rpc_client = Arc::new(RpcClient::new(config.rpc_url.clone()));
         info!("program_id: {}", program_id);
+        let treasury = Pubkey::from_str(config.treasury.as_str())
+            .map_err(|e| Error::TreasuryError(format!("{}", e)))?;
         Ok(Self {
             client,
             program_id,
             payer,
             rpc_client,
+            treasury,
         })
     }
 

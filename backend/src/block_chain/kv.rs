@@ -1,0 +1,629 @@
+// # upsert / get / scan / delete
+
+// # set_fee, collect_fee, 费用计算
+
+// # set_admin, set_pause, 权限校验
+
+use std::sync::{Arc, Mutex};
+
+use crate::{
+    block_chain::{
+        client::ChainClient,
+        types::{KVEvent, ValueAccount},
+    },
+    constants::{AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, VALUE_SEEDS},
+    error::{Error, Result},
+    storage::engine::DiskClient,
+    utils::bytes_to_str,
+};
+use anchor_client::anchor_lang::prelude::borsh::BorshDeserialize;
+
+use axum::Json;
+use base64::{Engine, engine::general_purpose};
+use contract::accounts; // 👈 用你的合约名
+use contract::instruction;
+use log::info;
+use serde_json::{Value, json};
+use solana_client::rpc_config::RpcTransactionConfig;
+use solana_sdk::{
+    commitment_config::CommitmentConfig, instruction::AccountMeta, pubkey::Pubkey,
+    signature::Signer, system_program,
+};
+
+// static GLOBAL_KEYS: Lazy<Mutex<Vec<Vec<u8>>>> = Lazy::new(|| Mutex::new(Vec::new()));
+
+/// 初始化存储
+pub async fn init_storage(chain: Arc<ChainClient>) -> Result<()> {
+    info!("backend init storage...");
+    // 新版合约需要的 PDA
+    let (meta_pda, _) = chain.find_pda(META_SEEDS);
+    let (head_pda, _) = chain.find_pda(HEAD_SEEDS);
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+
+    let admin = chain.payer.pubkey();
+
+    // 账户完全匹配新版合约
+    let accounts = accounts::InitStorage {
+        signer: admin,
+        meta: meta_pda,
+        head: head_pda,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        system_program: system_program::ID,
+    };
+
+    let args = instruction::InitStorage {};
+
+    let signature_result: Result<solana_sdk::signature::Signature> =
+        tokio::task::spawn_blocking(move || {
+            let program = chain.program()?;
+
+            let sig = program
+                .request()
+                .args(args)
+                .accounts(accounts)
+                .send()
+                .map_err(|e| {
+                    log::error!("init storage 失败: {:?}", e);
+                    Error::RpcError(format!("init 失败: {e}"))
+                })?;
+
+            // 等待交易确认
+            let mut retries = 0;
+            while retries < 10 {
+                if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                retries += 1;
+            }
+
+            log::info!("init_storage 成功: {}", sig);
+            Ok(sig)
+        })
+        .await
+        .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?;
+    info!("初始化完成，签名: {}", signature_result?);
+    Ok(())
+}
+
+/// 插入或者修改
+pub async fn upsert(
+    chain: Arc<ChainClient>,
+    storage: Arc<Mutex<DiskClient>>,
+    key: Vec<u8>,
+    value: Vec<u8>,
+) -> Result<()> {
+    info!("backend upsert key: {:?}, value: {:?}", key, value);
+
+    // 只保留合约真正需要的 PDA
+    let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("backend upsert value pda: {}", value_pda);
+
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    info!("backend upsert auth pda: {}", auth_pda);
+    let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+    info!("backend upsert fee pda: {}", fee_pda);
+
+    {
+        let mut disk = storage.lock().unwrap();
+        let _ = disk.set(key.clone(), value_pda.to_bytes().to_vec());
+    }
+
+    let admin = chain.payer.pubkey();
+
+    // 🔥 账户结构完全匹配新版合约
+    let accounts = accounts::Upsert {
+        signer: admin,
+        value_account: value_pda,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: chain.treasury,
+        system_program: system_program::ID,
+    };
+
+    let args = instruction::Upsert { key, value };
+
+    // 发送交易（不再需要 remaining_accounts！）
+    let signature_result = tokio::task::spawn_blocking(move || {
+        let program = chain.program()?;
+
+        let sig = program
+            .request()
+            .args(args)
+            .accounts(accounts)
+            // 🔥 完全删除了 remaining_accounts！
+            .send()
+            .map_err(|e| {
+                log::error!("upsert 交易发送失败: {:?}", e);
+                Error::RpcError(format!("upsert 失败: {e}"))
+            })?;
+
+        // 等待交易确认
+        let mut confirmation_retries = 0;
+        while confirmation_retries < 10 {
+            let status = chain
+                .rpc_client
+                .get_signature_status(&sig)
+                .map_err(|_| Error::IoError("获取交易状态失败".to_string()))?;
+
+            if let Some(Ok(_)) = status {
+                break;
+            }
+
+            let _ = std::thread::sleep(std::time::Duration::from_millis(500));
+            confirmation_retries += 1;
+        }
+
+        log::info!("交易签名: {}", sig);
+        Ok(sig)
+    })
+    .await;
+
+    let signature = match signature_result {
+        Ok(Ok(res)) => res,
+        Ok(Err(e)) => {
+            log::error!("交易执行失败: {:?}", e);
+            return Err(e);
+        }
+        Err(e) => {
+            log::error!("spawn_blocking 任务失败: {:?}", e);
+            return Err(Error::RpcError(format!("任务执行失败: {e}")));
+        }
+    };
+
+    log::info!("upsert 成功，签名: {:?}", signature);
+    Ok(())
+}
+
+pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<Json<Value>> {
+    info!("backend get key: {:?}", key);
+
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    info!("backend get auth pda: {}", auth_pda);
+    let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("backend get value pda: {}", value_pda);
+    let accounts = accounts::Get {
+        auth_config: auth_pda,
+        value_account: value_pda,
+    };
+    let args = instruction::Get { key };
+    // --- 🔥 关键修复开始：先克隆，再 move ---
+    // 在所有权被 move 之前，先克隆两份 Arc
+    let client_for_tx = Arc::clone(&chain);
+    let client_for_read = Arc::clone(&chain);
+    let sig_result = tokio::task::spawn_blocking(move || {
+        let program = client_for_tx.program()?;
+        program
+            .request()
+            .args(args)
+            .accounts(accounts)
+            .send()
+            .map_err(|e| Error::RpcError(format!("get 失败: {e}")))
+    })
+    .await
+    .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?; // 处理任务 panic
+    let signature = match sig_result {
+        Ok(sig) => sig,
+        Err(e) => {
+            // 如果是账户不存在，这里可以拦截并返回友好的提示
+            log::warn!("⚠️ 链上执行失败（可能账户已被删除）: {:?}", e);
+            return Ok(Json(json!({
+                "status": "not_found",
+                "message": "账户已删除或不存在"
+            })));
+        }
+    };
+    info!("get 成功，签名: {}", signature);
+
+    let raw_data_res: Result<Vec<u8>> = tokio::task::spawn_blocking(move || {
+        client_for_read
+            .rpc_client
+            .get_account_data(&value_pda)
+            .map_err(|e| Error::RpcError(format!("读取链上数据失败: {e}")))
+    })
+    .await
+    .map_err(|e| Error::RpcError(format!("读取任务执行失败: {e}")))?;
+    match raw_data_res {
+        Ok(data) => {
+            // 调用时手动跳过 8 字节判别码
+            let mut data_slice = &data[8..]; // 直接跳过前 8 位
+            // 使用 Anchor 的反序列化方法，它会自动处理那 8 字节并解析 Vec<u8>
+            let value_acc = ValueAccount::deserialize(&mut data_slice)
+                .map_err(|e| Error::RpcError(format!("反序列化失败: {e}")))?;
+
+            // 解析出真正的字符串内容
+            let value_str = String::from_utf8_lossy(&value_acc.data);
+            log::info!("✅ 最终解析出的值: {}", value_str);
+            Ok(Json(json!({ "status": "success", "data": value_str })))
+        }
+        _ => {
+            // 账户不存在（返回 404 语义，但不崩溃）
+            Ok(Json(
+                json!({ "status": "not_found", "message": "Key does not exist or has been deleted" }),
+            ))
+        }
+    }
+}
+
+/// 删除
+pub async fn delete(
+    chain: Arc<ChainClient>,
+    storage: Arc<Mutex<DiskClient>>,
+    key: Vec<u8>,
+) -> Result<()> {
+    info!("backend delete key: {:?}", key);
+
+    let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, key.as_slice()]);
+    info!("backend delete value pda: {}", value_pda);
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    info!("backend delete auth pda: {}", auth_pda);
+    let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+    info!("backend delete fee pda: {}", fee_pda);
+
+    {
+        let mut disk = storage.lock().unwrap();
+        let _ = disk.delete(key.clone());
+    }
+
+    let admin = chain.payer.pubkey();
+
+    let accounts = accounts::Delete {
+        signer: admin,
+        value_account: value_pda,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: chain.treasury,
+        system_program: system_program::ID,
+    };
+
+    let args = instruction::Delete { key };
+
+    let sig_result = tokio::task::spawn_blocking(move || {
+        let program = chain.program()?;
+        let sig = program
+            .request()
+            .args(args)
+            .accounts(accounts)
+            .send()
+            .map_err(|e| {
+                log::error!("delete 交易发送失败: {:?}", e);
+                Error::RpcError(format!("delete 失败: {e}"))
+            })?;
+
+        // 等待确认
+        let mut retries = 0;
+        while retries < 10 {
+            if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            retries += 1;
+        }
+
+        Ok(sig)
+    })
+    .await;
+
+    let signature = match sig_result {
+        Ok(Ok(res)) => res,
+        Ok(Err(e)) => {
+            log::error!("交易执行失败: {:?}", e);
+            return Err(e);
+        }
+        Err(e) => {
+            log::error!("spawn_blocking 任务失败: {:?}", e);
+            return Err(Error::RpcError(format!("任务执行失败: {e}")));
+        }
+    };
+
+    info!("delete 成功: {}", signature);
+    Ok(())
+}
+
+pub async fn scan(
+    chain: Arc<ChainClient>,
+    storage: Arc<Mutex<DiskClient>>,
+    start: Vec<u8>,
+    limit: u64,
+) -> Result<()> {
+    info!("backend scan start: {:?}, limit: {}", start, limit);
+
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    info!("backend scan auth pda: {}", auth_pda);
+    let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+    info!("backend scan fee pda: {}", fee_pda);
+    let admin = chain.payer.pubkey();
+
+    let client_for_tx = Arc::clone(&chain);
+
+    // 账户匹配新版合约
+    let accounts = accounts::Scan {
+        signer: admin,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: chain.treasury,
+        system_program: system_program::ID,
+    };
+
+    // ======================================================================
+    // 🔥 核心：scan 只需要把【你要扫描的 ValueAccount PDA】放进 remaining_accounts
+    // 这里我给你一个通用可用的版本：从 start 前缀批量生成 PDA（可直接用）
+    // ======================================================================
+    // ==============================
+    // 🔥 从后端拿到所有 key
+    // ==============================
+    // 1. 先在外层声明 k_v 变量
+    let k_v: Vec<(Vec<u8>, Vec<u8>)>;
+    {
+        let mut disk = storage.lock().unwrap();
+        let iter = disk.scan_prefix(start.clone());
+        k_v = iter
+            .skip(0)
+            .take(limit as usize)
+            .collect::<Result<Vec<_>>>()?;
+    }
+
+    // 把 key 列表通过指令数据传给合约
+    let keys: Vec<Vec<u8>> = k_v.iter().map(|(k, _)| k.clone()).collect();
+    let args = instruction::Scan {
+        start: start.clone(),
+        limit,
+        keys,
+    };
+
+    // ==============================
+    // 生成所有 ValueAccount PDA
+    // 传给合约做范围查询
+    // ==============================
+    let mut remaining_accounts = Vec::new();
+    for (key, pda) in k_v {
+        info!("key: {:?}", key);
+        // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
+        let value_pda = Pubkey::try_from(pda).unwrap();
+        remaining_accounts.push(AccountMeta::new_readonly(value_pda, false));
+    }
+
+    // 发送交易
+    let sig_result = tokio::task::spawn_blocking(move || {
+        let program = chain.program()?;
+        let sig = program
+            .request()
+            .args(args)
+            .accounts(accounts)
+            .accounts(remaining_accounts) // 传入要扫描的账户
+            .send()
+            .map_err(|e| {
+                log::error!("scan 交易发送失败: {:?}", e);
+                Error::RpcError(format!("scan 失败: {e}"))
+            })?;
+
+        // 等待确认
+        let mut retries = 0;
+        while retries < 10 {
+            if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            retries += 1;
+        }
+
+        Ok(sig)
+    })
+    .await;
+
+    let signature = match sig_result {
+        Ok(Ok(res)) => res,
+        Ok(Err(e)) => {
+            log::error!("交易执行失败: {:?}", e);
+            return Err(e);
+        }
+        Err(e) => {
+            log::error!("spawn_blocking 任务失败: {:?}", e);
+            return Err(Error::RpcError(format!("任务执行失败: {e}")));
+        }
+    };
+    info!("scan 交易成功: {}", signature);
+
+
+    // ==============================
+    // 用你的 RpcClient 直接获取交易日志（零报错版）
+    // ==============================
+    let tx = client_for_tx
+        .rpc_client
+        .get_transaction_with_config(
+            &signature,
+            RpcTransactionConfig {
+                // 关键：commitment 要包在 Some() 里
+                commitment: Some(CommitmentConfig::confirmed()),
+                ..Default::default()
+            },
+        )
+        .map_err(|e| Error::RpcError(format!("获取交易失败: {}", e)))?;
+
+    // 方式 A：先转成标准的 Option，再使用 ok_or_else
+    let meta = tx
+        .transaction
+        .meta
+        .ok_or_else(|| Error::RpcError("交易没有 meta 信息".to_string()))?;
+    let logs: Vec<String> = Option::from(meta.log_messages)
+        .ok_or_else(|| Error::RpcError("交易没有日志".to_string()))?;
+
+    info!("=== 交易日志（RPC 获取）===");
+    for log in &logs {
+        info!("{}", log);
+    }
+
+    // 解析事件
+    let mut results: Vec<(String, String)> = Vec::new();
+    for log in logs {
+        // 这里给 log 加个类型注解，解决 cannot infer type
+        let log: String = log;
+        // 匹配 Program data: 开头的日志
+        if log.starts_with("Program data: ") {
+            info!("匹配到 Program data 日志: {:?}", log);
+            let data = log.replace("Program data: ", "");
+
+            // 替换为推荐的 base64 解码方式，解决弃用警告
+            let bytes = general_purpose::STANDARD.decode(data).unwrap_or_default();
+
+            info!("解码后的字节长度: {}", bytes.len());
+
+            // Anchor 事件的前 8 字节是 discriminator，必须跳过
+            if bytes.len() > 8 {
+                match KVEvent::try_from_slice(&bytes[8..]) {
+                    Ok(event) => {
+                        info!(
+                            "✅ 解析成功 -> key: {:?}, value: {:?}",
+                            event.key, event.value
+                        );
+                        let kv = bytes_to_str(&event)
+                            .map_err(|e| Error::ParseEmitError(e.to_string()))?;
+                        results.push(kv);
+                    }
+                    Err(e) => {
+                        info!("❌ 解析失败: {:?}, data: {:?}", e, &bytes[8..]);
+                    }
+                }
+            }
+        }
+    }
+
+    info!("扫描完成，{:?}", results);
+    info!("扫描完成，共 {} 条数据", results.len());
+
+    Ok(())
+}
+
+// pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, offset: usize, limit: usize) -> Result<()> {
+//     info!("backend page offset: {:?}, limit: {}", offset, limit);
+
+//     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+//     info!("backend page auth pda: {}", auth_pda);
+//     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+//     info!("backend page fee pda: {}", fee_pda);
+//     let admin = chain.payer.pubkey();
+
+//     // 账户匹配新版合约
+//     let accounts = accounts::Scan {
+//         signer: admin,
+//         auth_config: auth_pda,
+//         fee_config: fee_pda,
+//         treasury: chain.treasury,
+//         system_program: system_program::ID,
+//     };
+
+//     let args = instruction::Scan {
+//         start: start.clone(),
+//         limit,
+//     };
+
+//     // ======================================================================
+//     // 🔥 核心：scan 只需要把【你要扫描的 ValueAccount PDA】放进 remaining_accounts
+//     // 这里我给你一个通用可用的版本：从 start 前缀批量生成 PDA（可直接用）
+//     // ======================================================================
+//     // ==============================
+//     // 🔥 从后端拿到所有 key
+//     // ==============================
+//     let all_keys = GLOBAL_KEYS.lock().unwrap().clone();
+
+//     // ==============================
+//     // 生成所有 ValueAccount PDA
+//     // 传给合约做范围查询
+//     // ==============================
+//     let mut remaining_accounts = Vec::new();
+//     for key in all_keys {
+//         let (pda, _) = client.find_pda(&[VALUE_SEEDS, &key]);
+//         remaining_accounts.push(AccountMeta::new_readonly(pda, false));
+//     }
+
+//     // 发送交易
+//     let sig_result = tokio::task::spawn_blocking(move || {
+//         let program = chain.program()?;
+//         let sig = program
+//             .request()
+//             .args(args)
+//             .accounts(accounts)
+//             .accounts(remaining_accounts) // 传入要扫描的账户
+//             .send()
+//             .map_err(|e| {
+//                 log::error!("scan 交易发送失败: {:?}", e);
+//                 Error::RpcError(format!("scan 失败: {e}"))
+//             })?;
+
+//         // 等待确认
+//         let mut retries = 0;
+//         while retries < 10 {
+//             if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+//                 break;
+//             }
+//             std::thread::sleep(std::time::Duration::from_millis(500));
+//             retries += 1;
+//         }
+
+//         Ok(sig)
+//     })
+//     .await;
+
+//     let signature = match sig_result {
+//         Ok(Ok(res)) => res,
+//         Ok(Err(e)) => {
+//             log::error!("交易执行失败: {:?}", e);
+//             return Err(e);
+//         }
+//         Err(e) => {
+//             log::error!("spawn_blocking 任务失败: {:?}", e);
+//             return Err(Error::RpcError(format!("任务执行失败: {e}")));
+//         }
+//     };
+//     info!("scan 交易成功: {}", signature);
+
+//     // ==============================
+//     // 🔥 直接用同步方式获取日志，不用 .await
+//     // ==============================
+//     // 注意：这里我们用 spawn_blocking 包裹同步 RPC 调用
+
+//     // ==============================
+//     // 🔥 用 solana-cli 命令行解析日志，100% 不依赖 Rust 类型
+//     // ==============================
+//     let logs = tokio::task::spawn_blocking(move || {
+//         let output = std::process::Command::new("solana")
+//             .arg("logs")
+//             .arg(&signature.to_string())
+//             .output()?;
+
+//         if !output.status.success() {
+//             return Err(Error::RpcError("获取交易日志失败".to_string()));
+//         }
+
+//         let logs = String::from_utf8_lossy(&output.stdout)
+//             .lines()
+//             .map(|s| s.to_string())
+//             .collect::<Vec<_>>();
+
+//         Ok(logs)
+//     })
+//     .await
+//     .map_err(|e| Error::ParseEmitError(e.to_string()))??;
+
+//     // 3. 解析日志里的 KVEvent
+//     let mut results = Vec::new();
+//     for log in logs {
+//         if log.starts_with("Program data: ") {
+//             info!("log: {:?}", log);
+//             let data = log.replace("Program data: ", "");
+//             let bytes = base64::decode(&data).unwrap_or_default();
+//             if bytes.len() > 8 {
+//                 if let Ok(event) = KVEvent::try_from_slice(&bytes[8..]) {
+//                     info!("✅ 解析成功 -> key: {:?}, value: {:?}", event.key, event.value);
+//                     results.push((event.key, event.value));
+//                 }
+//             }
+//         }
+//     }
+
+//     info!("扫描完成，共 {} 条数据", results.len());
+
+//     Ok(())
+// }

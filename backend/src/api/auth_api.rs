@@ -6,9 +6,9 @@ use axum::{
 };
 use log::info;
 use solana_sdk::pubkey::Pubkey;
-use std::str::FromStr;
+use std::{str::FromStr, sync::Arc};
 
-use crate::{AppState, auth};
+use crate::{AppState, auth, block_chain::client::ChainClient};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AuthQuery {
@@ -17,27 +17,27 @@ pub struct AuthQuery {
 }
 
 // 权限接口示例
-pub async fn init_auth(State(client): State<AppState>) -> impl IntoResponse {
+pub async fn init_auth(State(chain): State<Arc<ChainClient>>) -> impl IntoResponse {
     info!("init auth");
-    let _ = auth::init_auth(client).await;
+    let _ = auth::init_auth(chain).await;
     (StatusCode::OK, "init auth success")
 }
 
 pub async fn set_admin(
-    State(client): State<AppState>,
+    State(chain): State<Arc<ChainClient>>,
     Query(req): Query<AuthQuery>,
 ) -> impl IntoResponse {
     info!("set admin new_admin: {}", req.new_admin);
     let pubkey = Pubkey::from_str(req.new_admin.as_str()).unwrap();
-    let _ = auth::set_admin(client, pubkey).await;
+    let _ = auth::set_admin(chain, pubkey).await;
     (StatusCode::OK, "set admin success")
 }
 
 pub async fn set_pause(
-    State(client): State<AppState>,
+    State(chain): State<Arc<ChainClient>>,
     Query(req): Query<AuthQuery>,
 ) -> impl IntoResponse {
     info!("set pause paused: {}", req.paused);
-    let _ = auth::set_pause(client, req.paused).await;
+    let _ = auth::set_pause(chain, req.paused).await;
     (StatusCode::OK, "set pause success")
 }

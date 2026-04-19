@@ -7,3 +7,10 @@ use anchor_client::anchor_lang::prelude::*;
 pub struct ValueAccount {
     pub data: Vec<u8>, // <= MAX_VALUE_LEN
 }
+
+// 后端里的定义（必须和上面完全一样）
+#[derive(Debug, AnchorSerialize, AnchorDeserialize, Clone)]
+pub struct KVEvent {
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}

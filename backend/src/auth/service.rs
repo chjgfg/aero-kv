@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::{
-    chain::client::ChainClient,
+    block_chain::client::ChainClient,
     constants::AUTH_SEEDS,
     error::{Error, Result},
 };
@@ -12,16 +12,16 @@ use contract::instruction;
 use solana_sdk::{pubkey::Pubkey, signature::Signer, system_program};
 
 /// 初始化权限
-pub async fn init_auth(client: Arc<ChainClient>) -> Result<()> {
-    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+pub async fn init_auth(chain: Arc<ChainClient>,) -> Result<()> {
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::InitAuth {
         signer: admin,
         auth_config: auth_pda,
         system_program: system_program::ID,
     };
     let signature_result = tokio::task::spawn_blocking(move || {
-        let program = client.program()?;
+        let program = chain.program()?;
         let sig = program
             .request()
             .args(instruction::InitAuth {}) // Anchor 调用必须传 args，哪怕是空
@@ -48,16 +48,16 @@ pub async fn init_auth(client: Arc<ChainClient>) -> Result<()> {
 }
 
 /// 重置权限
-pub async fn set_admin(client: Arc<ChainClient>, new_admin: Pubkey) -> Result<()> {
-    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+pub async fn set_admin(chain: Arc<ChainClient>, new_admin: Pubkey) -> Result<()> {
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::SetAdmin {
         signer: admin,
         auth_config: auth_pda,
     };
     let args = instruction::SetAdmin { new_admin };
     let signature_result = tokio::task::spawn_blocking(move || {
-        let program = client.program()?;
+        let program = chain.program()?;
         let sig = program
             .request()
             .args(args)
@@ -84,16 +84,16 @@ pub async fn set_admin(client: Arc<ChainClient>, new_admin: Pubkey) -> Result<()
 }
 
 /// 暂停/开启合约
-pub async fn set_pause(client: Arc<ChainClient>, paused: bool) -> Result<()> {
-    let (auth_pda, _) = client.find_pda(AUTH_SEEDS);
-    let admin = client.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
+pub async fn set_pause(chain: Arc<ChainClient>, paused: bool) -> Result<()> {
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::SetPause {
         signer: admin,
         auth_config: auth_pda,
     };
     let args = instruction::SetPause { paused };
     let signature_result = tokio::task::spawn_blocking(move || {
-        let program = client.program()?;
+        let program = chain.program()?;
         let sig = program
             .request()
             .args(args)

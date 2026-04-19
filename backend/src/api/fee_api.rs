@@ -1,8 +1,10 @@
+use std::sync::Arc;
+
 // # set_fee 接口
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use log::info;
 
-use crate::{AppState, fee};
+use crate::{AppState, block_chain::client::ChainClient, fee};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FeeRequest {
@@ -12,14 +14,14 @@ pub struct FeeRequest {
 }
 
 // 手续费接口示例
-pub async fn init_fee(State(client): State<AppState>) -> impl IntoResponse {
+pub async fn init_fee(State(chain): State<Arc<ChainClient>>,) -> impl IntoResponse {
     info!("init fee");
-    let _ = fee::init_fee(client).await;
+    let _ = fee::init_fee(chain).await;
     (StatusCode::OK, "init fee success")
 }
 
 pub async fn set_fee(
-    State(client): State<AppState>,
+    State(chain): State<Arc<ChainClient>>,
     Json(req): Json<FeeRequest>,
 ) -> impl IntoResponse {
     info!(
@@ -27,7 +29,7 @@ pub async fn set_fee(
         req.base_fee, req.fee_per_byte, req.scan_fee_per_item
     );
     let _ = fee::set_fee(
-        client,
+        chain,
         req.base_fee,
         req.fee_per_byte,
         req.scan_fee_per_item,

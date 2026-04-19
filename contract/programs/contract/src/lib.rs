@@ -27,8 +27,8 @@ pub mod contract {
         storage::delete(ctx, key)
     }
 
-    pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64) -> Result<()> {
-        storage::scan(ctx, start, limit)
+    pub fn scan(ctx: Context<Scan>, start: Vec<u8>, limit: u64, keys: Vec<Vec<u8>>) -> Result<()> {
+        storage::scan(ctx, start, limit, keys)
     }
 
     pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {

@@ -11,11 +11,11 @@ pub struct HealthResponse {
     pub message: String,
 }
 
-pub async fn health(State(client): State<AppState>) -> impl IntoResponse {
+pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
     // 构造你自定义的数据
     let resp = HealthResponse {
         status: "ok".to_string(),
-        program_id: client.program_id.to_string(), // 从 Arc<ChainClient> 里拿！
+        program_id: state.chain.program_id.to_string(), // 从 Arc<ChainClient> 里拿！
         message: "service is running".to_string(),
     };
     // 返回 JSON

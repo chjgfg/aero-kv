@@ -1,38 +1,57 @@
 mod api;
 mod auth;
-mod chain;
+mod block_chain;
 mod config;
 mod constants;
 mod core;
+mod storage;
 mod error;
 mod fee;
 mod utils;
 
-use crate::chain::client::ChainClient;
+use crate::block_chain::client::ChainClient;
 use crate::config::log_config::log_config;
+use crate::storage::engine::DiskClient;
 use crate::error::Result;
 use crate::{config::env_config::Config, error::Error};
+use axum::extract::FromRef;
 use axum::{
     Router,
     routing::{delete, get, post},
 };
-use tower_http::cors::{Any, CorsLayer};
 use log::info;
-use std::sync::Arc;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
+use tower_http::cors::{Any, CorsLayer};
 
 // 给 ChainClient 加 Arc 包装，满足 Clone 约束（Axum State 要求 Clone）
-type AppState = Arc<ChainClient>;
+// 1. 给两个状态都包上 Arc（满足 Clone + Send + Sync + 'static）
+pub type ChainState = Arc<ChainClient>;
+pub type StorageState = Arc<Mutex<DiskClient>>;
+
+// 2. 定义统一的顶层状态结构体，派生 FromRef
+#[derive(Clone, FromRef)]
+pub struct AppState {
+    pub chain: ChainState,
+    pub storage: StorageState,
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let _ = log_config();
     let config = Config::from_env().map_err(|e| Error::ConfigError(e.to_string()))?;
     info!("开始创建client");
-    let client = ChainClient::new(&config)?;
-    let state = Arc::new(client); // 用 Arc 包装，满足 Clone 约束
+    let chain = ChainClient::new(&config)?;
+    let disk = DiskClient::new(PathBuf::from("./kv/kv.log"))?;
 
-    println!("✅ 链客户端初始化完成，程序ID: {}", state.program_id);
+        // 用 Arc 包装，再组合成 AppState
+    let state = AppState {
+        chain: Arc::new(chain),
+        storage: Arc::new(Mutex::new(disk)),
+    };
+
+    println!("✅ 链客户端初始化完成，程序ID: {}", state.chain.program_id);
 
     // 在你创建路由的地方加上这段 CORS
     let cors = CorsLayer::new()
@@ -41,7 +60,7 @@ async fn main() -> Result<()> {
         .allow_headers(Any)
         .expose_headers(Any)
         .allow_credentials(false);
-    
+
     // 4. 注册路由（Axum 0.8.x 标准写法）
     let app = Router::new()
         .route("/health", get(api::health))

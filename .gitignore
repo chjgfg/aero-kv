@@ -47,6 +47,7 @@ docs
 /backend/logs/**
 /backend/.env
 /backend/tests/**
+/backend/kv/*
 
 
 /contract/.anchor

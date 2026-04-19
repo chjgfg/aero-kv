@@ -4,7 +4,7 @@ use std::sync::Arc;
 use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use log::info;
 
-use crate::{AppState, block_chain::client::ChainClient, fee};
+use crate::{block_chain::client::ChainClient, fee};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FeeRequest {

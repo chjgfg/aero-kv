@@ -33,7 +33,7 @@ pub struct Delete<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
+pub fn delete(ctx: Context<Delete>, _key: Vec<u8>) -> Result<()> {
     msg!("Value PDA: {:?}", ctx.accounts.value_account.key());
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);

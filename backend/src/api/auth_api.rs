@@ -8,7 +8,7 @@ use log::info;
 use solana_sdk::pubkey::Pubkey;
 use std::{str::FromStr, sync::Arc};
 
-use crate::{AppState, auth, block_chain::client::ChainClient};
+use crate::{auth, block_chain::client::ChainClient};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct AuthQuery {

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
-    constants::{AUTH_SEEDS, FEE_SEEDS, VALUE_SEEDS},
+    constants::{AUTH_SEEDS, FEE_SEEDS},
     error::Error,
     fee::FeeConfig,
     storage::structs::ValueAccount,

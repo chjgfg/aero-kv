@@ -328,6 +328,9 @@ pub async fn scan(
     start: Vec<u8>,
     limit: u64,
 ) -> Result<()> {
+    if start.is_empty() {
+        return Err(Error::InvalidKey);
+    }
     info!("backend scan start: {:?}, limit: {}", start, limit);
 
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
@@ -496,134 +499,165 @@ pub async fn scan(
     Ok(())
 }
 
-// pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, offset: usize, limit: usize) -> Result<()> {
-//     info!("backend page offset: {:?}, limit: {}", offset, limit);
+pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page: usize, limit: usize) -> Result<()> {
+    info!("backend page offset: {:?}, limit: {}", page, limit);
 
-//     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
-//     info!("backend page auth pda: {}", auth_pda);
-//     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
-//     info!("backend page fee pda: {}", fee_pda);
-//     let admin = chain.payer.pubkey();
+    let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
+    info!("backend page auth pda: {}", auth_pda);
+    let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
+    info!("backend page fee pda: {}", fee_pda);
+    let admin = chain.payer.pubkey();
 
-//     // 账户匹配新版合约
-//     let accounts = accounts::Scan {
-//         signer: admin,
-//         auth_config: auth_pda,
-//         fee_config: fee_pda,
-//         treasury: chain.treasury,
-//         system_program: system_program::ID,
-//     };
+    let client_for_tx = Arc::new(chain.clone());
 
-//     let args = instruction::Scan {
-//         start: start.clone(),
-//         limit,
-//     };
+    // 账户匹配新版合约
+    let accounts = accounts::Page {
+        signer: admin,
+        auth_config: auth_pda,
+        fee_config: fee_pda,
+        treasury: chain.treasury,
+        system_program: system_program::ID,
+    };
 
-//     // ======================================================================
-//     // 🔥 核心：scan 只需要把【你要扫描的 ValueAccount PDA】放进 remaining_accounts
-//     // 这里我给你一个通用可用的版本：从 start 前缀批量生成 PDA（可直接用）
-//     // ======================================================================
-//     // ==============================
-//     // 🔥 从后端拿到所有 key
-//     // ==============================
-//     let all_keys = GLOBAL_KEYS.lock().unwrap().clone();
 
-//     // ==============================
-//     // 生成所有 ValueAccount PDA
-//     // 传给合约做范围查询
-//     // ==============================
-//     let mut remaining_accounts = Vec::new();
-//     for key in all_keys {
-//         let (pda, _) = client.find_pda(&[VALUE_SEEDS, &key]);
-//         remaining_accounts.push(AccountMeta::new_readonly(pda, false));
-//     }
+    // ======================================================================
+    // 🔥 核心：scan 只需要把【你要扫描的 ValueAccount PDA】放进 remaining_accounts
+    // 这里我给你一个通用可用的版本：从 start 前缀批量生成 PDA（可直接用）
+    // ======================================================================
+    // ==============================
+    // 🔥 从后端拿到所有 key
+    // ==============================
+    let page_data: Vec<(Vec<u8>, Vec<u8>)>;
+    {
+        let mut disk = storage.lock().unwrap();
+        page_data = disk.page(limit, page)?;
+    }
 
-//     // 发送交易
-//     let sig_result = tokio::task::spawn_blocking(move || {
-//         let program = chain.program()?;
-//         let sig = program
-//             .request()
-//             .args(args)
-//             .accounts(accounts)
-//             .accounts(remaining_accounts) // 传入要扫描的账户
-//             .send()
-//             .map_err(|e| {
-//                 log::error!("scan 交易发送失败: {:?}", e);
-//                 Error::RpcError(format!("scan 失败: {e}"))
-//             })?;
+    // 把 key 列表通过指令数据传给合约
+    let keys: Vec<Vec<u8>> = page_data.iter().map(|(k, _)| k.clone()).collect();
+    let args = instruction::Page {
+        keys,
+    };
 
-//         // 等待确认
-//         let mut retries = 0;
-//         while retries < 10 {
-//             if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
-//                 break;
-//             }
-//             std::thread::sleep(std::time::Duration::from_millis(500));
-//             retries += 1;
-//         }
+     // ==============================
+    // 生成所有 ValueAccount PDA
+    // 传给合约做范围查询
+    // ==============================
+    let mut remaining_accounts = Vec::new();
+    for (key, pda) in page_data {
+        info!("key: {:?}", key);
+        // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
+        let value_pda = Pubkey::try_from(pda).unwrap();
+        remaining_accounts.push(AccountMeta::new_readonly(value_pda, false));
+    }
 
-//         Ok(sig)
-//     })
-//     .await;
+    // 发送交易
+    let sig_result = tokio::task::spawn_blocking(move || {
+        let program = chain.program()?;
+        let sig = program
+            .request()
+            .args(args)
+            .accounts(accounts)
+            .accounts(remaining_accounts) // 传入要扫描的账户
+            .send()
+            .map_err(|e| {
+                log::error!("scan 交易发送失败: {:?}", e);
+                Error::RpcError(format!("scan 失败: {e}"))
+            })?;
 
-//     let signature = match sig_result {
-//         Ok(Ok(res)) => res,
-//         Ok(Err(e)) => {
-//             log::error!("交易执行失败: {:?}", e);
-//             return Err(e);
-//         }
-//         Err(e) => {
-//             log::error!("spawn_blocking 任务失败: {:?}", e);
-//             return Err(Error::RpcError(format!("任务执行失败: {e}")));
-//         }
-//     };
-//     info!("scan 交易成功: {}", signature);
+        // 等待确认
+        let mut retries = 0;
+        while retries < 10 {
+            if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            retries += 1;
+        }
 
-//     // ==============================
-//     // 🔥 直接用同步方式获取日志，不用 .await
-//     // ==============================
-//     // 注意：这里我们用 spawn_blocking 包裹同步 RPC 调用
+        Ok(sig)
+    })
+    .await;
 
-//     // ==============================
-//     // 🔥 用 solana-cli 命令行解析日志，100% 不依赖 Rust 类型
-//     // ==============================
-//     let logs = tokio::task::spawn_blocking(move || {
-//         let output = std::process::Command::new("solana")
-//             .arg("logs")
-//             .arg(&signature.to_string())
-//             .output()?;
+    let signature = match sig_result {
+        Ok(Ok(res)) => res,
+        Ok(Err(e)) => {
+            log::error!("交易执行失败: {:?}", e);
+            return Err(e);
+        }
+        Err(e) => {
+            log::error!("spawn_blocking 任务失败: {:?}", e);
+            return Err(Error::RpcError(format!("任务执行失败: {e}")));
+        }
+    };
+    info!("scan 交易成功: {}", signature);
 
-//         if !output.status.success() {
-//             return Err(Error::RpcError("获取交易日志失败".to_string()));
-//         }
 
-//         let logs = String::from_utf8_lossy(&output.stdout)
-//             .lines()
-//             .map(|s| s.to_string())
-//             .collect::<Vec<_>>();
+    // ==============================
+    // 用你的 RpcClient 直接获取交易日志（零报错版）
+    // ==============================
+    let tx = client_for_tx
+        .rpc_client
+        .get_transaction_with_config(
+            &signature,
+            RpcTransactionConfig {
+                // 关键：commitment 要包在 Some() 里
+                commitment: Some(CommitmentConfig::confirmed()),
+                ..Default::default()
+            },
+        )
+        .map_err(|e| Error::RpcError(format!("获取交易失败: {}", e)))?;
 
-//         Ok(logs)
-//     })
-//     .await
-//     .map_err(|e| Error::ParseEmitError(e.to_string()))??;
+    // 方式 A：先转成标准的 Option，再使用 ok_or_else
+    let meta = tx
+        .transaction
+        .meta
+        .ok_or_else(|| Error::RpcError("交易没有 meta 信息".to_string()))?;
+    let logs: Vec<String> = Option::from(meta.log_messages)
+        .ok_or_else(|| Error::RpcError("交易没有日志".to_string()))?;
 
-//     // 3. 解析日志里的 KVEvent
-//     let mut results = Vec::new();
-//     for log in logs {
-//         if log.starts_with("Program data: ") {
-//             info!("log: {:?}", log);
-//             let data = log.replace("Program data: ", "");
-//             let bytes = base64::decode(&data).unwrap_or_default();
-//             if bytes.len() > 8 {
-//                 if let Ok(event) = KVEvent::try_from_slice(&bytes[8..]) {
-//                     info!("✅ 解析成功 -> key: {:?}, value: {:?}", event.key, event.value);
-//                     results.push((event.key, event.value));
-//                 }
-//             }
-//         }
-//     }
+    info!("=== 交易日志（RPC 获取）===");
+    for log in &logs {
+        info!("{}", log);
+    }
 
-//     info!("扫描完成，共 {} 条数据", results.len());
+    // 解析事件
+    let mut results: Vec<(String, String)> = Vec::new();
+    for log in logs {
+        // 这里给 log 加个类型注解，解决 cannot infer type
+        let log: String = log;
+        // 匹配 Program data: 开头的日志
+        if log.starts_with("Program data: ") {
+            info!("匹配到 Program data 日志: {:?}", log);
+            let data = log.replace("Program data: ", "");
 
-//     Ok(())
-// }
+            // 替换为推荐的 base64 解码方式，解决弃用警告
+            let bytes = general_purpose::STANDARD.decode(data).unwrap_or_default();
+
+            info!("解码后的字节长度: {}", bytes.len());
+
+            // Anchor 事件的前 8 字节是 discriminator，必须跳过
+            if bytes.len() > 8 {
+                match KVEvent::try_from_slice(&bytes[8..]) {
+                    Ok(event) => {
+                        info!(
+                            "✅ 解析成功 -> key: {:?}, value: {:?}",
+                            event.key, event.value
+                        );
+                        let kv = bytes_to_str(&event)
+                            .map_err(|e| Error::ParseEmitError(e.to_string()))?;
+                        results.push(kv);
+                    }
+                    Err(e) => {
+                        info!("❌ 解析失败: {:?}, data: {:?}", e, &bytes[8..]);
+                    }
+                }
+            }
+        }
+    }
+
+    info!("扫描完成，{:?}", results);
+    info!("扫描完成，共 {} 条数据", results.len());
+
+    Ok(())
+}

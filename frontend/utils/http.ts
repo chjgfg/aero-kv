@@ -156,8 +156,29 @@ const scan = async (key: string, limit: number) => {
     return data;
 }
 
+const page = async (page: number, limit: number) => {
+    const res = await fetch("http://192.168.40.131/kv/page", {
+        method: "POST", // 必须是 POST，因为你的后端路由是这么定义的
+        headers: {
+            "Content-Type": "application/json",
+        },
+        // 2. 将参数放入 Body 传给后端
+        body: JSON.stringify({
+            page: page,
+            limit: limit,
+        }),
+    });
+
+    if (!res.ok) {
+        throw new Error(`请求失败: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data;
+}
+
 // ----------------------------------------------------------------------------------------------------------------------------------
 
 export {
-    health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets
+    health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page
 }

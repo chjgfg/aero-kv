@@ -22,6 +22,12 @@ pub struct KVRequest {
 }
 
 #[derive(Debug, serde::Deserialize)]
+pub struct PageRequest {
+    pub page: usize,
+    pub limit: usize,
+}
+
+#[derive(Debug, serde::Deserialize)]
 pub struct KVQuery {
     pub key: String,
 }
@@ -76,6 +82,26 @@ pub async fn scan(
     info!("scan key: {}, limit: {}", req.key, req.limit);
     let key = req.key.into_bytes();
     let l = req.limit;
-    let _ = block_chain::scan(chain, storage, key, l).await;
-    (StatusCode::OK, "scan success")
+    // let _ = block_chain::scan(chain, storage, key, l).await;
+    // (StatusCode::OK, "scan success")
+    // 关键：用 match 处理 scan 的 Result，而不是直接 _
+    match block_chain::scan(chain, storage, key, l).await {
+        Ok(_) => (StatusCode::OK, "scan success".to_string()),
+        Err(e) => {
+            // 把错误信息返回给前端
+            (StatusCode::BAD_REQUEST, format!("scan failed: {}", e))
+        }
+    }
+}
+
+pub async fn page(
+    State(chain): State<Arc<ChainClient>>,
+    State(storage): State<Arc<Mutex<DiskClient>>>,
+    Json(req): Json<PageRequest>,
+) -> impl IntoResponse {
+    info!("page offset: {}, limit: {}", req.page, req.limit);
+    let o = req.page;
+    let l = req.limit;
+    let _ = block_chain::page(chain, storage, o, l).await;
+    (StatusCode::OK, "page success")
 }

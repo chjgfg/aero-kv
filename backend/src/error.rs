@@ -1,6 +1,6 @@
 // # 后端自定义错误
 
-use std::{fmt::Display};
+use std::fmt::Display;
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -20,6 +20,8 @@ pub enum Error {
     IoError(String),
     TreasuryError(String),
     ParseEmitError(String),
+    LimitError,
+    InvalidPageError,
 }
 
 impl Display for Error {
@@ -38,6 +40,8 @@ impl Display for Error {
             Error::IoError(msg) => write!(f, "IO 错误: {msg}"),
             Error::TreasuryError(msg) => write!(f, "Treasury 错误: {msg}"),
             Error::ParseEmitError(msg) => write!(f, "解析 Emit 错误: {msg}"),
+            Error::LimitError => write!(f, "Limit 输入 错误"),
+            Error::InvalidPageError => write!(f, "输入 页码 错误"),
         }
     }
 }
@@ -54,4 +58,3 @@ impl From<dotenv::Error> for Error {
         Error::ConfigError(format!("{}", e))
     }
 }
-

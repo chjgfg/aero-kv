@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
         .route("/kv/delete", delete(api::delete))
         .route("/kv/get", get(api::gets))
         .route("/kv/scan", post(api::scan))
+        .route("/kv/page", post(api::page))
         // 权限接口
         .route("/auth/init-admin", post(api::init_auth))
         .route("/auth/set-admin", post(api::set_admin))

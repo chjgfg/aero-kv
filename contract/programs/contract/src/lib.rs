@@ -34,6 +34,10 @@ pub mod contract {
     pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
         storage::upsert(ctx, key, value)
     }
+    
+    pub fn page(ctx: Context<Page>, keys: Vec<Vec<u8>>) -> Result<()> {
+        storage::page(ctx, keys)
+    }
 
     // ---------------------------------------------------------------------------------------------------------
     pub use super::auth::*;

@@ -1,5 +1,7 @@
+// use anchor_client::anchor_lang::require;
+
 use crate::{
-    error::Result,
+    error::{Error, Result},
     storage::{
         iter::DiskIterator,
         storage::{KeyDir, Log},
@@ -97,9 +99,18 @@ impl DiskClient {
         Ok(self.keydir.len())
     }
 
-    pub fn page(&mut self, limit: usize, offset: usize) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+    pub fn page(&mut self, limit: usize, page: usize) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
         // 边界检查：offset 超过总条数时返回空
         let mut data: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
+        if limit <= 0 {
+            return Err(Error::LimitError);
+        }
+        // 页码从1开始，第1页对应 offset=0
+        if page < 1 {
+            return Err(Error::InvalidPageError);
+        }
+        let offset = (page - 1) * limit;
+
         if offset >= self.keydir.len() {
             return Ok(data.clone());
         }

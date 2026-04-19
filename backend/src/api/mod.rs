@@ -5,5 +5,5 @@ pub mod kv_api;
 
 pub use auth_api::{init_auth, set_admin, set_pause};
 pub use fee_api::{init_fee, set_fee};
-pub use kv_api::{delete, gets, init_storage, scan, upsert};
+pub use kv_api::{delete, gets, init_storage, scan, upsert, page};
 pub use health_api::health;

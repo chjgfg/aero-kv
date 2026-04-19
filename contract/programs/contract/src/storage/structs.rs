@@ -36,3 +36,11 @@ pub struct ValueAccount {
 impl ValueAccount {
     pub const LEN: usize = 8 + 4 + MAX_VALUE_LEN;
 }
+
+
+#[derive(Debug)]
+#[event]
+pub struct KVEvent {
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+}

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 // # upsert / get / scan 接口
 use axum::{
@@ -10,8 +10,8 @@ use axum::{
 use log::info;
 
 use crate::{
-    block_chain::{self, client::ChainClient},
-    storage::engine::DiskClient,
+    block_chain::{self},
+    raft::types::AppContext,
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -33,18 +33,22 @@ pub struct KVQuery {
 }
 
 // 示例 KV 接口（你可以替换成自己的业务逻辑）
-pub async fn init_storage(State(chain): State<Arc<ChainClient>>) -> impl IntoResponse {
+pub async fn init_storage(State(state): State<Arc<AppContext>>) -> impl IntoResponse {
     info!("init storage");
+    let chain = state.chain.clone();
     let _ = block_chain::init_storage(chain).await;
     // 这里写你的 upsert 业务逻辑
     (StatusCode::OK, "init storage success")
 }
 
 pub async fn upsert(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    // State(chain): State<Arc<ChainClient>>,
+    // State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppContext>>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     info!("upsert key: {}, value: {}", req.key, req.value);
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
@@ -54,10 +58,13 @@ pub async fn upsert(
 }
 
 pub async fn delete(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    // State(chain): State<Arc<ChainClient>>,
+    // State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppContext>>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     info!("delete key: {}", req.key);
     let k = req.key.into_bytes();
     let _ = block_chain::delete(chain, storage, k).await;
@@ -65,9 +72,10 @@ pub async fn delete(
 }
 
 pub async fn gets(
-    State(chain): State<Arc<ChainClient>>,
+    State(state): State<Arc<AppContext>>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
+    let chain = state.chain.clone();
     info!("get key: {}", req.key);
     let k = req.key.into_bytes();
     let _ = block_chain::get(chain, k).await;
@@ -75,10 +83,13 @@ pub async fn gets(
 }
 
 pub async fn scan(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    // State(chain): State<Arc<ChainClient>>,
+    // State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppContext>>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     info!("scan key: {}, limit: {}", req.key, req.limit);
     let key = req.key.into_bytes();
     let l = req.limit;
@@ -95,10 +106,13 @@ pub async fn scan(
 }
 
 pub async fn page(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    // State(chain): State<Arc<ChainClient>>,
+    // State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppContext>>,
     Json(req): Json<PageRequest>,
 ) -> impl IntoResponse {
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     info!("page offset: {}, limit: {}", req.page, req.limit);
     let o = req.page;
     let l = req.limit;

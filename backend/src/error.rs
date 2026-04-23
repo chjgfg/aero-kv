@@ -1,11 +1,12 @@
 // # 后端自定义错误
 
 use std::fmt::Display;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone, Serialize, PartialEq, Deserialize)]
 pub enum Error {
     InvalidProgramId(String),
     RpcError(String),

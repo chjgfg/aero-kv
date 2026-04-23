@@ -31,3 +31,8 @@ time = { version = "0.3", features = ["macros", "local-offset"] }
 once_cell = "1.21.4"
 base64 = "0.22.1"
 bs58 = { version = "0.5", features = ["check"] }
+
+# 2. 并发与消息传递 (连接 HTTP 和 Raft)
+crossbeam = "0.8"        # 强力推荐：用于实现代码中的 select! 宏和同步 Channel
+rand = "0.8"             # 用于生成唯一的 Request ID
+reqwest = { version = "0.11", features = ["json", "blocking"] }

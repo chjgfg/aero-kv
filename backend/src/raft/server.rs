@@ -1,11 +1,11 @@
 use crate::{
-    error::Error, raft::{raft::Node, types::{Command, Envelope, Message, RaftTask}}, storage::engine::DiskClient
+    api::raft_api, block_chain::client::ChainClient, error::Error, raft::{raft::Node, types::{Command, Envelope, Message, RaftTask}}, storage::engine::DiskClient
 };
 
 use crossbeam::channel::{Receiver, select};
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock},
+    sync::{Arc, Mutex, RwLock},
     time::Instant,
 };
 use tokio::sync::oneshot;
@@ -16,11 +16,14 @@ pub struct Server {
     // 核心：暂存正在等待共识结果的 HTTP 请求
     pending_responses: HashMap<u64, oneshot::Sender<Result<Vec<u8>, Error>>>,
     pub storage: Arc<RwLock<DiskClient>>,
+
+    chain: Arc<ChainClient>,
+    kv_storage: Arc<Mutex<DiskClient>>,
 }
 
 
 impl Server {
-    pub fn new(id: u64, peers: Vec<u64>, storage: Arc<RwLock<DiskClient>>) -> Self {
+    pub fn new(id: u64, peers: Vec<u64>, storage: Arc<RwLock<DiskClient>>, chain: Arc<ChainClient>, kv_storage: Arc<Mutex<DiskClient>>,) -> Self {
         // 1. 创建一个通道，用于接收来自 Raft 内部的消息
         let (node_tx, node_rx) = crossbeam::channel::unbounded();
 
@@ -32,6 +35,9 @@ impl Server {
             node_rx,
             pending_responses: HashMap::new(),
             storage, // 👈 确保这里正确传入
+            
+            chain,
+            kv_storage,
         }
     }
 
@@ -46,7 +52,11 @@ impl Server {
         // 使用 reqwest 异步发送 (注意：这里在同步线程，可以用 blocking 客户端)
         std::thread::spawn(move || {
             let client = reqwest::blocking::Client::new();
-            let _ = client.post(url).json(&envelope).send();
+            let _res = client.post(url).json(&envelope).send();
+            // match res {
+            //     Ok(_) => println!("🚀 Successfully sent msg to node {}", target_id),
+            //     Err(e) => println!("❌ Failed to send to node {}: {:?}", target_id, e),
+            // }
         });
     }
 
@@ -55,59 +65,197 @@ impl Server {
             match &envelope.message {
                 // 情况 A：Leader 确认共识达成，产生响应
                 // 此时 Leader 会进入这里并更新本地存储
-                Message::ClientResponse { id: _, response } => {
-                    if let Ok(data) = response {
-                        if let Ok(cmd) = serde_json::from_slice::<Command>(data) {
-                            let k = cmd.key.as_bytes();
-                            let mut store = self.storage.write().unwrap();
-                            match cmd.op.as_str() {
-                                "upsert" => {
-                                    // 🚀 这里是关键：打印出每个字节的十进制值
-                                    println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
-                                    let Some(value) = cmd.value else {
-                                        println!("⚠️ Warn: SET operation missing value for key: {}", cmd.key);
-                                        return;
-                                    };
-                                    store.set(k.to_vec(), value.as_bytes().to_vec()).expect("Storage set failed");
-                                    println!("💾 [Leader Apply] Node {}: {} = {}", self.node.id, cmd.key, value);
-                                }
-                                "delete" => {
-                                    store.delete(cmd.key.as_bytes().to_vec()).ok(); // 👈 调用 memory.rs 的删除逻辑
-                                    println!("🗑️ [Node {}] Deleted key: {}", self.node.id, cmd.key);
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
+                // Message::ClientResponse { id: _, response } => {
+                //     if let Ok(data) = response {
+                //         if let Ok(cmd) = serde_json::from_slice::<Command>(data) {
+                //             let k = cmd.key.as_bytes();
+                //             // let mut store = self.storage.write().unwrap();
+                //             match cmd.op.as_str() {
+                //                 "upsert" => {
+                //                     // 🚀 这里是关键：打印出每个字节的十进制值
+                //                     println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
+                //                     let Some(value) = cmd.value else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.value);
+                //                         return;
+                //                     };
+                //                     tokio::spawn(raft_api::raft_upsert(self.chain.clone(), self.kv_storage.clone(), k.to_vec(), value.as_bytes().to_vec()));
+                //                     println!("💾 [Leader Apply] Node {}: {} = {}", self.node.id, cmd.key, value);
+                //                 }
+                //                 "delete" => {
+                //                     tokio::spawn(raft_api::raft_delete(self.chain.clone(), self.kv_storage.clone(), k.to_vec()));
+                //                     println!("🗑️ [Node {}] Deleted key: {}", self.node.id, cmd.key);
+                //                 }                               
+                //                 "admin" => {
+                //                     let Some(new_admin) = cmd.new_admin else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.new_admin);
+                //                         return;
+                //                     };
+                //                     tokio::spawn(raft_api::raft_admin(self.chain.clone(), new_admin.clone()));
+                //                     println!("🗑️ [Node {}] Admin key: {}", self.node.id, new_admin);
+                //                 }
+                //                 "pause" => {
+                //                     let Some(paused) = cmd.paused else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.paused);
+                //                         return;
+                //                     };
+                //                     tokio::spawn(raft_api::raft_pause(self.chain.clone(), paused));
+                //                     println!("🗑️ [Node {}] Pause key: {}", self.node.id, paused);
+                //                 }
+                //                 "fee" => {
+                //                     let Some(base_fee) = cmd.base_fee else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.base_fee);
+                //                         return;
+                //                     };
+                //                     let Some(fee_per_byte) = cmd.fee_per_byte else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.fee_per_byte);
+                //                         return;
+                //                     };
+                //                     let Some(scan_fee_per_item) = cmd.scan_fee_per_item else {
+                //                         println!("⚠️ Warn: SET operation missing value for key: {:?}", cmd.scan_fee_per_item);
+                //                         return;
+                //                     };
+                //                     tokio::spawn(raft_api::raft_fee(self.chain.clone(), base_fee, fee_per_byte, scan_fee_per_item));
+                //                     println!("🗑️ [Node {}] Fee key: {}, {}, {}", self.node.id, base_fee, fee_per_byte, scan_fee_per_item);
+                //                 }
+                //                 _ => {}
+                //             }
+                //         }
+                //     }
+                // }
+// server.rs 内部修改
+Message::ClientResponse { id: _, response } => {
+    if let Ok(data) = response {
+        // 反序列化为新的枚举类型
+        if let Ok(cmd) = serde_json::from_slice::<Command>(data) {
+            match cmd {
+                // 🚀 使用模式匹配直接解构出 key 和 value
+                Command::Upsert { key, value } => {
+                    let k = key.as_bytes();
+                    println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
+                    
+                    tokio::spawn(raft_api::raft_upsert(
+                        self.chain.clone(), 
+                        self.kv_storage.clone(), 
+                        k.to_vec(), 
+                        value.into_bytes()
+                    ));
+                    
+                    println!("💾 [Leader Apply] Node {}: {} = (hidden)", self.node.id, key);
                 }
+
+                Command::Delete { key } => {
+                    let k = key.as_bytes();
+                    tokio::spawn(raft_api::raft_delete(
+                        self.chain.clone(), 
+                        self.kv_storage.clone(), 
+                        k.to_vec()
+                    ));
+                    println!("🗑️ [Node {}] Deleted key: {}", self.node.id, key);
+                }
+
+                Command::Admin { new_admin } => {
+                    tokio::spawn(raft_api::raft_admin(
+                        self.chain.clone(), 
+                        new_admin.clone()
+                    ));
+                    println!("👑 [Node {}] New Admin: {}", self.node.id, new_admin);
+                }
+
+                Command::Fee { base_fee, fee_per_byte, scan_fee_per_item } => {
+                    tokio::spawn(raft_api::raft_fee(
+                        self.chain.clone(),
+                        base_fee,
+                        fee_per_byte,
+                        scan_fee_per_item,
+                    ));
+                    println!("💸 [Node {}] Fee Updated", self.node.id);
+                }
+
+                Command::Pause { paused } => {
+                    tokio::spawn(raft_api::raft_pause(
+                        self.chain.clone(), 
+                        paused
+                    ));
+                    println!("⏸️ [Node {}] Pause State: {}", self.node.id, paused);
+                }
+            }
+        }
+    }
+}
 
                 // 情况 B：Follower 收到来自 Leader 的日志同步（Append）
                 // 此时 Follower 必须解析日志并更新本地存储
-                Message::Append { entries, .. } => {
-                    for entry in entries {
-                        // 如果 entry 中有 command（即指令），则应用到存储
-                        if let Some(command) = &entry.command {
-                            if let Ok(req) = serde_json::from_slice::<Command>(command) {
-                                let k = req.key.as_bytes();
-                                // 🚀 这里是关键：打印出每个字节的十进制值
-                                println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
-                                let mut store = self.storage.write().unwrap();
-                                let Some(value) = req.value else {
-                                    return;
-                                };
-                                store.set(k.to_vec(), value.as_bytes().to_vec()).expect("Storage set failed");
-                                println!("🔥 REAL WRITE: key={}, val={}", req.key, value);
-                                println!("💾 [Follower Apply] Node {}: {} = {}", self.node.id, req.key, value);
-                                // 强行读取确认
-                                let check = store.get(req.key.as_bytes().to_vec()).ok();
-                                println!("🔍 Instant Check: {:?}", check);
-                            } else {
-                                // 💡 如果解析失败，这里会报错
-                                println!("❌ FAILED TO PARSE COMMAND");
-                            }
-                        }
+                // Message::Append { entries, .. } => {
+                //     for entry in entries {
+                //         // 如果 entry 中有 command（即指令），则应用到存储
+                //         if let Some(command) = &entry.command {
+                //             if let Ok(req) = serde_json::from_slice::<Command>(command) {
+                //                 let k = req.key.as_bytes();
+                //                 // 🚀 这里是关键：打印出每个字节的十进制值
+                //                 println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
+                //                 let mut store = self.storage.write().unwrap();
+                //                 let Some(value) = req.value else {
+                //                     return;
+                //                 };
+                //                 store.set(k.to_vec(), value.as_bytes().to_vec()).expect("Storage set failed");
+                //                 println!("🔥 REAL WRITE: key={}, val={}", req.key, value);
+                //                 println!("💾 [Follower Apply] Node {}: {} = {}", self.node.id, req.key, value);
+                //                 // 强行读取确认
+                //                 let check = store.get(req.key.as_bytes().to_vec()).ok();
+                //                 println!("🔍 Instant Check: {:?}", check);
+                //             } else {
+                //                 // 💡 如果解析失败，这里会报错
+                //                 println!("❌ FAILED TO PARSE COMMAND");
+                //             }
+                //         }
+                //     }
+                // }
+// server.rs -> handle_envelopes 内部
+Message::Append { entries, .. } => {
+    for entry in entries {
+        if let Some(command_bytes) = &entry.command {
+            if let Ok(req) = serde_json::from_slice::<Command>(command_bytes) {
+                // 🚀 使用 match 对枚举进行模式匹配和解构
+                match req {
+                    Command::Upsert { key, value } => {
+                        let k = key.as_bytes();
+                        println!("📍 Node {} WRITING KEY: {:?} (len: {})", self.node.id, k, k.len());
+                        
+                        let mut store = self.storage.write().unwrap();
+                        store.set(k.to_vec(), value.as_bytes().to_vec()).expect("Storage set failed");
+                        
+                        println!("🔥 REAL WRITE: key={}, val=(hidden)", key);
+                        println!("💾 [Follower Apply] Node {}: {} = (hidden)", self.node.id, key);
+
+                        // 强行读取确认
+                        let check = store.get(k.to_vec()).ok();
+                        println!("🔍 Instant Check: {:?}", check);
+                    }
+                    
+                    Command::Delete { key } => {
+                        let mut store = self.storage.write().unwrap();
+                        store.delete(key.as_bytes().to_vec()).expect("Storage delete failed");
+                        println!("🗑️ [Follower Apply] Node {} Deleted key: {}", self.node.id, key);
+                    }
+
+                    // 其他变体（Admin, Fee, Pause）在 Follower 端通常不直接写入存储，
+                    // 而是通过同样的 tokio::spawn 调用相应的 raft_api 函数来保持状态同步
+                    Command::Admin { new_admin } => {
+                        tokio::spawn(raft_api::raft_admin(self.chain.clone(), new_admin));
+                    }
+                    Command::Fee { base_fee, fee_per_byte, scan_fee_per_item } => {
+                        tokio::spawn(raft_api::raft_fee(self.chain.clone(), base_fee, fee_per_byte, scan_fee_per_item));
+                    }
+                    Command::Pause { paused } => {
+                        tokio::spawn(raft_api::raft_pause(self.chain.clone(), paused));
                     }
                 }
+            } else {
+                println!("❌ FAILED TO PARSE COMMAND");
+            }
+        }
+    }
+}
                 _ => {}
             }
 

@@ -10,6 +10,7 @@ mod fee;
 mod utils;
 mod raft;
 
+use crate::api::raft_api;
 use crate::block_chain::client::ChainClient;
 use crate::config::log_config::log_config;
 use crate::raft::server::Server;
@@ -22,7 +23,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use log::info;
-use std::env;
+use std::{env, fs};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, Instant};
@@ -43,7 +44,10 @@ pub type StorageState = Arc<Mutex<DiskClient>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-
+    let dir = PathBuf::from("./kv");
+    if !dir.exists() {
+        fs::create_dir(dir).unwrap();
+    }
 
     // 解析参数: cargo run -- <ID> <PORT> <PEER_IDS...>
     let args: Vec<String> = env::args().collect();
@@ -74,36 +78,37 @@ async fn main() -> Result<()> {
         ticker_tx.send(Instant::now()).ok();
     });
 
+    let _ = log_config(app_log.as_str());
+    let config = Config::from_env().map_err(|e| Error::ConfigError(e.to_string()))?;
+    info!("开始创建client");
+
+    let chain = Arc::new(ChainClient::new(&config)?);
+    let disk = Arc::new(Mutex::new(DiskClient::new(PathBuf::from(kv_log))?));
+
     // 启动 Raft 核心线程
     let storage_for_raft = storage.clone();
+    let chain_for_raft = chain.clone();
+    let kv_storage_for_raft = disk.clone();
+
+    let handle = tokio::runtime::Handle::current();
     std::thread::spawn(move || {
-        let server = Server::new(node_id, peer_ids, storage_for_raft);
+        let _guard = handle.enter(); // 🚀 必须进入句柄，spawn 才能在独立线程生效
+        let server = Server::new(node_id, peer_ids, storage_for_raft, chain_for_raft,  kv_storage_for_raft);
         server.run(ticker_rx, peers_rx, task_rx);
     });
 
 
 
-    let _ = log_config(app_log);
-    let config = Config::from_env().map_err(|e| Error::ConfigError(e.to_string()))?;
-    info!("开始创建client");
-    let chain = ChainClient::new(&config)?;
-    let disk = DiskClient::new(PathBuf::from(kv_log))?;
-
-    // // 用 Arc 包装，再组合成 AppState
-    // let state = AppState {
-    //     chain: Arc::new(chain),
-    //     storage: Arc::new(Mutex::new(disk)),
-    // };
-
-
+    let chain_for_storage = chain.clone();
+    let kv_storage_for_storage = disk.clone();
     // 配置 Axum
     let state =  Arc::new(AppContext {
         node_id,
         task_sender: task_tx,
         peers_sender: peers_tx,
         kv_store: storage,
-        chain: Arc::new(chain),
-        storage: Arc::new(Mutex::new(disk)),
+        chain: chain_for_storage,
+        storage: kv_storage_for_storage,
     });
 
 
@@ -119,21 +124,22 @@ async fn main() -> Result<()> {
 
     // 4. 注册路由（Axum 0.8.x 标准写法）
     let app = Router::new()
+        .route("/raft/message", post(raft_api::handle_raft_msg)) // 🚀 必须加这一行！
         .route("/health", get(api::health))
         // KV 接口
         .route("/kv/init-storage", post(api::init_storage))
-        .route("/kv/upsert", post(api::upsert))
-        .route("/kv/delete", delete(api::delete))
+        .route("/kv/upsert", post(raft_api::kv_set))
+        .route("/kv/delete", delete(raft_api::kv_set))
         .route("/kv/get", get(api::gets))
         .route("/kv/scan", post(api::scan))
         .route("/kv/page", post(api::page))
         // 权限接口
         .route("/auth/init-admin", post(api::init_auth))
-        .route("/auth/set-admin", post(api::set_admin))
-        .route("/auth/set-pause", post(api::set_pause))
+        .route("/auth/set-admin", post(raft_api::kv_set))
+        .route("/auth/set-pause", post(raft_api::kv_set))
         // 手续费接口
         .route("/fee/init-fee", post(api::init_fee))
-        .route("/fee/set-fee", post(api::set_fee))
+        .route("/fee/set-fee", post(raft_api::kv_set))
         // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
         .layer(cors)
         // 注入状态（Arc<ChainClient>）

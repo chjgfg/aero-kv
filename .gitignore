@@ -59,4 +59,7 @@ docs
 /contract/.yarn
 /contract/Cargo.lock
 
+/proxy/Cargo.lock
+/proxy/target
+
 test-ledger

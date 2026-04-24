@@ -6,11 +6,27 @@ use tokio::sync::oneshot;
 
 use crate::{block_chain::client::ChainClient, error::Error, storage::engine::DiskClient};
 
+// #[derive(Serialize, Deserialize, Debug, Clone)]
+// pub struct Command {
+//     pub op: String, // "SET", "DELETE"
+//     pub key: String,
+//     pub value: Option<String>, // DELETE 时为 None
+
+//     pub new_admin: Option<String>,   // 改为 Option
+//     pub paused: Option<bool>,       // 改为 Option
+
+//     pub base_fee: Option<u64>,
+//     pub fee_per_byte: Option<u64>,
+//     pub scan_fee_per_item: Option<u64>,
+// }
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Command {
-    pub op: String, // "SET", "DELETE"
-    pub key: String,
-    pub value: Option<String>, // DELETE 时为 None
+#[serde(tag = "op", rename_all = "lowercase")]
+pub enum Command {
+    Upsert { key: String, value: String },
+    Delete { key: String },
+    Admin { new_admin: String },
+    Fee { base_fee: u64, fee_per_byte: u64, scan_fee_per_item: u64 },
+    Pause { paused: bool },
 }
 
 #[derive(Deserialize, Debug)]

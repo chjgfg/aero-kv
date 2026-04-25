@@ -590,7 +590,7 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
             return Err(Error::RpcError(format!("任务执行失败: {e}")));
         }
     };
-    info!("scan 交易成功: {}", signature);
+    info!("page 交易成功: {}", signature);
 
 
     // ==============================

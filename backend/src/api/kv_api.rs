@@ -41,6 +41,7 @@ pub async fn init_storage(State(state): State<Arc<AppContext>>) -> impl IntoResp
     (StatusCode::OK, "init storage success")
 }
 
+#[allow(dead_code)]
 pub async fn upsert(
     // State(chain): State<Arc<ChainClient>>,
     // State(storage): State<Arc<Mutex<DiskClient>>>,
@@ -57,6 +58,7 @@ pub async fn upsert(
     (StatusCode::OK, "upsert success")
 }
 
+#[allow(dead_code)]
 pub async fn delete(
     // State(chain): State<Arc<ChainClient>>,
     // State(storage): State<Arc<Mutex<DiskClient>>>,

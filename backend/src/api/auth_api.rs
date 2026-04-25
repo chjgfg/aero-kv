@@ -24,6 +24,7 @@ pub async fn init_auth(State(state): State<Arc<AppContext>>) -> impl IntoRespons
     (StatusCode::OK, "init auth success")
 }
 
+#[allow(dead_code)]
 pub async fn set_admin(
     State(state): State<Arc<AppContext>>,
     Query(req): Query<AuthQuery>,
@@ -35,6 +36,7 @@ pub async fn set_admin(
     (StatusCode::OK, "set admin success")
 }
 
+#[allow(dead_code)]
 pub async fn set_pause(
     State(state): State<Arc<AppContext>>,
     Query(req): Query<AuthQuery>,

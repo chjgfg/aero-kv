@@ -35,6 +35,7 @@ pub struct GetParams {
 }
 
 // 全局上下文
+#[allow(dead_code)]
 pub struct AppContext {
     pub node_id: u64,
     pub task_sender: Sender<RaftTask>,

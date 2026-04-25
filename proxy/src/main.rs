@@ -8,6 +8,7 @@ use axum::{
     http::{Method as AxumMethod, StatusCode as AxumStatusCode, Uri},
     response::IntoResponse,
 };
+use tower_http::cors::{Any, CorsLayer};
 
 // 1. 定义状态结构
 struct GatewayState {
@@ -84,9 +85,17 @@ async fn main() {
         current: Mutex::new(0),
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .expose_headers(Any)
+        .allow_credentials(false);
+
     // 使用 any 方法，匹配所有路径，这样不需要一个个写 route
     let app = Router::new()
         .fallback(proxy_handler) //  fallback 会捕获所有未定义的路径并转发
+        .layer(cors)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:80").await.unwrap();

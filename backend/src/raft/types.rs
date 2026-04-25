@@ -29,6 +29,7 @@ pub enum Command {
     Pause { paused: bool },
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct GetParams {
     pub key: String,

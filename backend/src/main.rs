@@ -20,6 +20,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use log::info;
+use rs_merkle::{MerkleTree, algorithms::Sha256};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -36,6 +37,9 @@ pub type StorageState = Arc<Mutex<DiskClient>>;
 pub struct AppState {
     pub chain: ChainState,
     pub storage: StorageState,
+    // 用 Mutex 包裹，实现线程安全的修改
+    pub merkle_tree: Arc<Mutex<MerkleTree<Sha256>>>,
+    pub leaf_hashes: Arc<Mutex<Vec<[u8; 32]>>>,
 }
 
 #[tokio::main]
@@ -57,6 +61,8 @@ async fn main() -> Result<()> {
     let state : Arc<AppState> = Arc::new(AppState {
         chain: Arc::new(chain),
         storage: Arc::new(Mutex::new(disk)),
+        merkle_tree: Arc::new(Mutex::new(MerkleTree::new())),
+        leaf_hashes: Arc::new(Mutex::new(Vec::new())),
     });
 
     println!("✅ 链客户端初始化完成，程序ID: {}", state.chain.program_id);

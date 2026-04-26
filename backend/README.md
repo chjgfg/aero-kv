@@ -7,8 +7,8 @@ curl -X POST http://localhost/auth/init-admin
 curl -X POST http://localhost/kv/init-storage
 curl -X POST http://localhost/fee/init-fee
 
-curl -X POST http://localhost/kv/upsert -H "Content-Type: application/json" -d "{\"key\": \"name1\", \"value\": \"AeroKV1\"}"
-curl -X POST http://localhost/kv/upsert -H "Content-Type: application/json" -d "{\"key\": \"name2\", \"value\": \"AeroKV2\"}"
+curl -X POST http://localhost/kv/upsert -H "Content-Type: application/json" -d "{\"key\": \"name1\", \"value\": \"AeroKV1\", \"limit\": 0}"
+curl -X POST http://localhost/kv/upsert -H "Content-Type: application/json" -d "{\"key\": \"name2\", \"value\": \"AeroKV2\", \"limit\": 0}"
 
 curl -X DELETE http://localhost/kv/delete -H "Content-Type: application/json" -d "{\"op\": \"delete\", \"key\": \"name1\"}"
 

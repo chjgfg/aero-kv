@@ -1,4 +1,4 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 
 // # upsert / get / scan 接口
 use axum::{
@@ -8,11 +8,10 @@ use axum::{
     response::IntoResponse,
 };
 use log::info;
-use rs_merkle::{Hasher as _, algorithms::Sha256};
 
 use crate::{
     AppState,
-    block_chain::{self}, utils,
+    block_chain::{self},
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -53,7 +52,7 @@ pub async fn upsert(
     let v = req.value.into_bytes();
     let _ = block_chain::upsert(chain, storage, k, v).await;
     // 这里写你的 upsert 业务逻辑
-    let _ = utils::calc_merkle_root(state);
+    // let _ = utils::calc_merkle_root(state);
     (StatusCode::OK, "upsert success")
 }
 
@@ -66,7 +65,7 @@ pub async fn delete(
     let storage = state.storage.clone();
     let k = req.key.into_bytes();
     let _ = block_chain::delete(chain, storage, k).await;
-    let _ = utils::calc_merkle_root(state);
+    // let _ = utils::calc_merkle_root(state);
     (StatusCode::OK, "delete success")
 }
 

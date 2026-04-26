@@ -132,4 +132,9 @@ impl DiskClient {
         }
         Ok(data)
     }
+
+    pub fn get_keys(&self) -> Result<Vec<Vec<u8>>> {
+        Ok(self.keydir.iter().map(|(k, _)| k.clone()).collect())
+    }
+
 }

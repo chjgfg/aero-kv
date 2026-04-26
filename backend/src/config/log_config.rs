@@ -4,7 +4,7 @@ use simplelog::{ColorChoice, CombinedLogger, TermLogger, TerminalMode, WriteLogg
 use std::path::Path;
 use time::macros::format_description;
 
-pub fn log_config() -> Result<()> {
+pub fn log_config(path: &str) -> Result<()> {
     // let loglevel = cfg.log_level.parse()?;
     let mut logconfig = simplelog::ConfigBuilder::new();
     // 第一步：尝试设置本地时区
@@ -13,7 +13,7 @@ pub fn log_config() -> Result<()> {
     logconfig.set_time_format_custom(format_description!(
         "[year]-[month]-[day] [hour]:[minute]:[second]"
     ));
-    let log_path = Path::new("./logs/app.log");
+    let log_path = Path::new(path);
     CombinedLogger::init(vec![
         // 控制台彩色日志（0.12.x 仅4个参数）
         TermLogger::new(
@@ -35,7 +35,5 @@ pub fn log_config() -> Result<()> {
     ])
     .map_err(|e| Error::LogError(format!("日志初始化失败: {}", e)))?;
     log::info!("✅ 服务启动，日志已写入文件: {}", log_path.display());
-    // log::debug!("🔍 调试日志测试");
-    // log::error!("❌ 错误日志测试");
     Ok(())
 }

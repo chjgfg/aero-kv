@@ -60,3 +60,5 @@ docs
 /contract/Cargo.lock
 
 test-ledger
+
+/sh

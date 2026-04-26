@@ -31,3 +31,9 @@ time = { version = "0.3", features = ["macros", "local-offset"] }
 once_cell = "1.21.4"
 base64 = "0.22.1"
 bs58 = { version = "0.5", features = ["check"] }
+
+
+rs_merkle = "0.1"   # 最简单的 Merkle 库
+sha2 = "0.10"
+hex = "0.4"
+bincode = "3.0.0"

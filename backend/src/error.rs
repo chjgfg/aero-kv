@@ -22,6 +22,7 @@ pub enum Error {
     ParseEmitError(String),
     LimitError,
     InvalidPageError,
+    InvalidParam(String),
 }
 
 impl Display for Error {
@@ -42,6 +43,7 @@ impl Display for Error {
             Error::ParseEmitError(msg) => write!(f, "解析 Emit 错误: {msg}"),
             Error::LimitError => write!(f, "Limit 输入 错误"),
             Error::InvalidPageError => write!(f, "输入 页码 错误"),
+            Error::InvalidParam(msg)  => write!(f, "无效参数: {msg}"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 // # upsert / get / scan 接口
 use axum::{
@@ -8,10 +8,11 @@ use axum::{
     response::IntoResponse,
 };
 use log::info;
+use rs_merkle::{Hasher as _, algorithms::Sha256};
 
 use crate::{
-    block_chain::{self, client::ChainClient},
-    storage::engine::DiskClient,
+    AppState,
+    block_chain::{self}, utils,
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -33,57 +34,67 @@ pub struct KVQuery {
 }
 
 // 示例 KV 接口（你可以替换成自己的业务逻辑）
-pub async fn init_storage(State(chain): State<Arc<ChainClient>>) -> impl IntoResponse {
+pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     info!("init storage");
+    let chain = state.chain.clone();
     let _ = block_chain::init_storage(chain).await;
     // 这里写你的 upsert 业务逻辑
     (StatusCode::OK, "init storage success")
 }
 
 pub async fn upsert(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
     info!("upsert key: {}, value: {}", req.key, req.value);
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
     let _ = block_chain::upsert(chain, storage, k, v).await;
     // 这里写你的 upsert 业务逻辑
+    let _ = utils::calc_merkle_root(state);
     (StatusCode::OK, "upsert success")
 }
 
 pub async fn delete(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppState>>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
     info!("delete key: {}", req.key);
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     let k = req.key.into_bytes();
     let _ = block_chain::delete(chain, storage, k).await;
+    let _ = utils::calc_merkle_root(state);
     (StatusCode::OK, "delete success")
 }
 
 pub async fn gets(
-    State(chain): State<Arc<ChainClient>>,
+    State(state): State<Arc<AppState>>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
     info!("get key: {}", req.key);
+    let chain = state.chain.clone();
     let k = req.key.into_bytes();
     let _ = block_chain::get(chain, k).await;
+
+    // 生成 Merkle 证明
+    // let key_hash = Sha256::hash(&k).to_vec();
+    // let proof = state.merkle_tree.proof(&key_hash);
+    // let proof_bytes = bincode::serialize(&proof).unwrap();
     (StatusCode::OK, "get success")
 }
 
 pub async fn scan(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
     info!("scan key: {}, limit: {}", req.key, req.limit);
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     let key = req.key.into_bytes();
     let l = req.limit;
-    // let _ = block_chain::scan(chain, storage, key, l).await;
-    // (StatusCode::OK, "scan success")
     // 关键：用 match 处理 scan 的 Result，而不是直接 _
     match block_chain::scan(chain, storage, key, l).await {
         Ok(_) => (StatusCode::OK, "scan success".to_string()),
@@ -95,11 +106,12 @@ pub async fn scan(
 }
 
 pub async fn page(
-    State(chain): State<Arc<ChainClient>>,
-    State(storage): State<Arc<Mutex<DiskClient>>>,
+    State(state): State<Arc<AppState>>,
     Json(req): Json<PageRequest>,
 ) -> impl IntoResponse {
     info!("page offset: {}, limit: {}", req.page, req.limit);
+    let chain = state.chain.clone();
+    let storage = state.storage.clone();
     let o = req.page;
     let l = req.limit;
     let _ = block_chain::page(chain, storage, o, l).await;

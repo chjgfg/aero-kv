@@ -32,7 +32,7 @@ const setAuth = async (new_admin: string) => {
 
 const setPause = async (paused: boolean) => {
     // 将参数拼接到 URL 后面
-    const url = `http://192.168.40.131/auth/set-pause?new_admin=${paused}`;
+    const url = `http://192.168.40.131/auth/set-pause?paused=${paused}`;
     const res = await fetch(url, {
         method: "POST", // 后端路由是 POST
         headers: {

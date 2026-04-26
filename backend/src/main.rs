@@ -20,6 +20,8 @@ use axum::{
     routing::{delete, get, post},
 };
 use log::info;
+use rs_merkle::{MerkleTree, algorithms::Sha256};
+use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::net::TcpListener;
@@ -35,21 +37,30 @@ pub type StorageState = Arc<Mutex<DiskClient>>;
 pub struct AppState {
     pub chain: ChainState,
     pub storage: StorageState,
+    pub merkle_tree: MerkleTree<Sha256>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let _ = log_config();
+    let dir = PathBuf::from("./kv");
+    if !dir.exists() {
+        fs::create_dir(dir).unwrap();
+    }
+    let kv_log = format!("./kv/kv.log");
+    let app_log = format!("./kv/app.log");
+
+    let _ = log_config(app_log.as_str());
     let config = Config::from_env().map_err(|e| Error::ConfigError(e.to_string()))?;
     info!("开始创建client");
     let chain = ChainClient::new(&config)?;
-    let disk = DiskClient::new(PathBuf::from("./kv/kv.log"))?;
+    let disk = DiskClient::new(PathBuf::from(kv_log))?;
 
-        // 用 Arc 包装，再组合成 AppState
-    let state = AppState {
+    // 用 Arc 包装，再组合成 AppState
+    let state : Arc<AppState> = Arc::new(AppState {
         chain: Arc::new(chain),
         storage: Arc::new(Mutex::new(disk)),
-    };
+        merkle_tree: MerkleTree::<Sha256>::new(),
+    });
 
     println!("✅ 链客户端初始化完成，程序ID: {}", state.chain.program_id);
 

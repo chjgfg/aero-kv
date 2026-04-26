@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{Json, extract::State, response::IntoResponse};
 use serde::Serialize;
 
@@ -11,7 +13,7 @@ pub struct HealthResponse {
     pub message: String,
 }
 
-pub async fn health(State(state): State<AppState>) -> impl IntoResponse {
+pub async fn health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     // 构造你自定义的数据
     let resp = HealthResponse {
         status: "ok".to_string(),

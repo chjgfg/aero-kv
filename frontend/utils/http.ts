@@ -88,6 +88,7 @@ const initStorage = async () => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -110,6 +111,7 @@ const upsert = async (key: string, value: string) => {
     }
 
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -123,6 +125,7 @@ const deleted = async (key: string) => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -131,6 +134,7 @@ const gets = async (key: string) => {
     const url = `http://192.168.40.131/kv/get?key=${key}`;
     const res = await fetch(url);
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -153,6 +157,7 @@ const scan = async (key: string, limit: number) => {
     }
 
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -174,6 +179,7 @@ const page = async (page: number, limit: number) => {
     }
 
     const data = await res.json();
+    console.log(data);
     return data;
 }
 

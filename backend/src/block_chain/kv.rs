@@ -4,8 +4,8 @@
 
 // # set_admin, set_pause, 权限校验
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::{Arc};
+use tokio::sync::Mutex;
 use crate::{
     block_chain::{
         client::ChainClient,
@@ -18,12 +18,10 @@ use crate::{
 };
 use anchor_client::anchor_lang::prelude::borsh::BorshDeserialize;
 
-use axum::Json;
 use base64::{Engine, engine::general_purpose};
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
 use log::info;
-use serde_json::{Value, json};
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::{
     commitment_config::CommitmentConfig, instruction::AccountMeta, pubkey::Pubkey,
@@ -107,7 +105,7 @@ pub async fn upsert(
     info!("backend upsert fee pda: {}", fee_pda);
 
     {
-        let mut disk = storage.lock().unwrap();
+        let mut disk = storage.lock().await;
         let _ = disk.set(key.clone(), value_pda.to_bytes().to_vec());
     }
 
@@ -177,7 +175,7 @@ pub async fn upsert(
     Ok(())
 }
 
-pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<Json<Value>> {
+pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<String> {
     info!("backend get key: {:?}", key);
 
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
@@ -209,10 +207,7 @@ pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<Json<Value>> {
         Err(e) => {
             // 如果是账户不存在，这里可以拦截并返回友好的提示
             log::warn!("⚠️ 链上执行失败（可能账户已被删除）: {:?}", e);
-            return Ok(Json(json!({
-                "status": "not_found",
-                "message": "账户已删除或不存在"
-            })));
+            return Ok("not_found".to_string());
         }
     };
     info!("get 成功，签名: {}", signature);
@@ -236,13 +231,11 @@ pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<Json<Value>> {
             // 解析出真正的字符串内容
             let value_str = String::from_utf8_lossy(&value_acc.data);
             log::info!("✅ 最终解析出的值: {}", value_str);
-            Ok(Json(json!({ "status": "success", "data": value_str })))
+            Ok(value_str.to_string())
         }
         _ => {
             // 账户不存在（返回 404 语义，但不崩溃）
-            Ok(Json(
-                json!({ "status": "not_found", "message": "Key does not exist or has been deleted" }),
-            ))
+            Ok("not_found".to_string())
         }
     }
 }
@@ -263,7 +256,7 @@ pub async fn delete(
     info!("backend delete fee pda: {}", fee_pda);
 
     {
-        let mut disk = storage.lock().unwrap();
+        let mut disk = storage.lock().await;
         let _ = disk.delete(key.clone());
     }
 
@@ -327,7 +320,7 @@ pub async fn scan(
     storage: Arc<Mutex<DiskClient>>,
     start: Vec<u8>,
     limit: u64,
-) -> Result<()> {
+) -> Result<Vec<(String, String)>> {
     if start.is_empty() {
         return Err(Error::InvalidKey);
     }
@@ -360,7 +353,7 @@ pub async fn scan(
     // 1. 先在外层声明 k_v 变量
     let k_v: Vec<(Vec<u8>, Vec<u8>)>;
     {
-        let mut disk = storage.lock().unwrap();
+        let mut disk = storage.lock().await;
         let iter = disk.scan_prefix(start.clone());
         k_v = iter
             .skip(0)
@@ -496,10 +489,10 @@ pub async fn scan(
     info!("扫描完成，{:?}", results);
     info!("扫描完成，共 {} 条数据", results.len());
 
-    Ok(())
+    Ok(results)
 }
 
-pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page: usize, limit: usize) -> Result<()> {
+pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page: usize, limit: usize) -> Result<Vec<(String, String)>> {
     info!("backend page offset: {:?}, limit: {}", page, limit);
 
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
@@ -529,7 +522,7 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
     // ==============================
     let page_data: Vec<(Vec<u8>, Vec<u8>)>;
     {
-        let mut disk = storage.lock().unwrap();
+        let mut disk = storage.lock().await;
         page_data = disk.page(limit, page)?;
     }
 
@@ -659,5 +652,5 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
     info!("扫描完成，{:?}", results);
     info!("扫描完成，共 {} 条数据", results.len());
 
-    Ok(())
+    Ok(results)
 }

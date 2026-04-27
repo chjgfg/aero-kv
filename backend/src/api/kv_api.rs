@@ -1,4 +1,4 @@
-use std::sync::{Arc};
+use std::sync::Arc;
 
 // # upsert / get / scan 接口
 use axum::{
@@ -12,7 +12,8 @@ use rs_merkle::{Hasher as _, algorithms::Sha256};
 
 use crate::{
     AppState,
-    block_chain::{self}, utils,
+    block_chain::{self},
+    utils,
 };
 
 #[derive(Debug, serde::Deserialize)]
@@ -39,7 +40,7 @@ pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoRespon
     let chain = state.chain.clone();
     let _ = block_chain::init_storage(chain).await;
     // 创建第一棵树
-    let _ = utils::calc_merkle_root(state);
+    let _ = utils::calc_merkle_root(state).await;
     (StatusCode::OK, "init storage success")
 }
 
@@ -54,7 +55,7 @@ pub async fn upsert(
     let v = req.value.into_bytes();
     let _ = block_chain::upsert(chain, storage, k, v).await;
     //  重建树
-    let _ = utils::calc_merkle_root(state);
+    let _ = utils::calc_merkle_root(state).await;
     (StatusCode::OK, "upsert success")
 }
 
@@ -68,7 +69,7 @@ pub async fn delete(
     let k = req.key.into_bytes();
     let _ = block_chain::delete(chain, storage, k).await;
     // 重建树
-    let _ = utils::calc_merkle_root(state);
+    let _ = utils::calc_merkle_root(state).await;
     (StatusCode::OK, "delete success")
 }
 
@@ -78,9 +79,9 @@ pub async fn gets(
 ) -> impl IntoResponse {
     info!("get key: {}", req.key);
     let chain = state.chain.clone();
-    let k = req.key.into_bytes();
+    let k = req.key.clone().into_bytes();
     // let _ = block_chain::get(chain, k).await;
-    let value = match block_chain::get(chain, k).await {
+    let value = match block_chain::get(chain, k.clone()).await {
         Ok(v) => v,
         Ok(_) => return (StatusCode::NOT_FOUND, "key not found").into_response(),
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "storage error").into_response(),
@@ -94,29 +95,23 @@ pub async fn gets(
 
     // 5. 查找 key 在 Merkle 树中的位置（索引）
     let Some(index) = leaf_hashes.iter().position(|hash| hash == &key_hash) else {
-        return (StatusCode::NOT_FOUND, "key not in merkle tree");
+        return (StatusCode::NOT_FOUND, "key not in merkle tree").into_response();
     };
 
     // 6. 获取全局 Merkle 树
+    // 5. 获取树和根
     let tree = state.merkle_tree.lock().await;
+    let root = tree.root().unwrap_or_default();
 
-    // 7. 生成证明（关键：传入索引）
-    let proof = tree.proof(&[index]);
-
-    // 8. 序列化证明（返回给前端/用户验证）
-    let proof_bytes = match bincode::serialize(&proof) {
-        Ok(p) => p,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "proof serialize error"),
-    };
-
-    // 9. 返回 value + 证明 + root
-    let json = Json(serde_json::json!({
+    // 6. 不序列化 proof，直接返回验证所需的信息
+    Json(serde_json::json!({
         "key": req.key,
         "value": hex::encode(value),
-        "proof": hex::encode(proof_bytes),
-        "merkle_root": hex::encode(tree.root().unwrap_or_default()),
-    }));
-    (StatusCode::OK, json.as_str().unwrap())
+        "merkle_root": hex::encode(root),
+        "key_hash": hex::encode(key_hash),
+        "leaf_index": index,
+    }))
+    .into_response()
 }
 
 pub async fn scan(
@@ -129,13 +124,6 @@ pub async fn scan(
     let key = req.key.into_bytes();
     let l = req.limit;
     // 关键：用 match 处理 scan 的 Result，而不是直接 _
-    // match block_chain::scan(chain, storage, key, l).await {
-    //     Ok(_) => (StatusCode::OK, "scan success".to_string()),
-    //     Err(e) => {
-    //         // 把错误信息返回给前端
-    //         (StatusCode::BAD_REQUEST, format!("scan failed: {}", e))
-    //     }
-    // }
     // 1. 先拿到 scan 的结果（保持你原来的调用方式）
     let scan_result = match block_chain::scan(chain, storage.clone(), key, l).await {
         Ok(keys) => keys, // 假设这里返回 Vec<Vec<u8>>
@@ -146,26 +134,33 @@ pub async fn scan(
     let leaf_hashes = state.leaf_hashes.lock().await;
 
     // 3. 批量找索引
+    // 3. 批量找索引和哈希
     let mut indices = Vec::new();
-    for key in &scan_result {
-        let key_hash = rs_merkle::algorithms::Sha256::hash(key);
+    let mut key_hashes = Vec::new();
+    for entry in &scan_result {
+        let key = entry.0.clone();
+        let key_hash = Sha256::hash(&key.as_bytes().to_vec());
         if let Some(idx) = leaf_hashes.iter().position(|h| h == &key_hash) {
             indices.push(idx);
+            key_hashes.push(key_hash);
         }
     }
 
     // 4. 读取全局 Merkle 树，生成批量证明
     let tree = state.merkle_tree.lock().await;
-    let proof = tree.proof(&indices);
-    let proof_bytes = bincode::serialize(&proof).unwrap_or_default();
     let root = tree.root().unwrap_or_default();
 
-    // ===================== 返回带证明的结果 =====================
+    // 5. 返回批量验证所需的信息
     Json(serde_json::json!({
-        "keys": scan_result.iter().map(|k| hex::encode(k)).collect::<Vec<_>>(),
+        "pairs": scan_result.iter().map(|(k, v)| serde_json::json!({
+            "key": k,
+            "value": v
+        })).collect::<Vec<_>>(),
         "merkle_root": hex::encode(root),
-        "proof": hex::encode(proof_bytes),
-    })).into_response()
+        "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
+        "leaf_indices": indices,
+    }))
+    .into_response()
 }
 
 pub async fn page(
@@ -175,38 +170,45 @@ pub async fn page(
     info!("page offset: {}, limit: {}", req.page, req.limit);
     let chain = state.chain.clone();
     let storage = state.storage.clone();
-    let o = req.page;
-    let l = req.limit;
+    let page = req.page;
+    let limit: usize = req.limit;
     // let _ = block_chain::page(chain, storage, o, l).await;
     // 1. 拿到分页结果（保持你原来的调用方式）
-    let page_result = match block_chain::page(chain, storage, o, l).await {
+    let page_result = match block_chain::page(chain, storage, page, limit).await {
         Ok(keys) => keys, // 假设这里返回 Vec<Vec<u8>>
         Err(e) => return (StatusCode::BAD_REQUEST, format!("page failed: {}", e)).into_response(),
     };
 
     // ===================== 新增 Merkle 证明部分 =====================
     let leaf_hashes = state.leaf_hashes.lock().await;
+
+    // 3. 批量找索引和 key 哈希
     let mut indices = Vec::new();
-    for key in &page_result {
-        let key_hash = rs_merkle::algorithms::Sha256::hash(key);
+    let mut key_hashes = Vec::new();
+    for entry in &page_result {
+        let key = &entry.0;
+        let key_hash = rs_merkle::algorithms::Sha256::hash(&key.as_bytes().to_vec());
         if let Some(idx) = leaf_hashes.iter().position(|h| h == &key_hash) {
             indices.push(idx);
+            key_hashes.push(key_hash);
         }
     }
 
+    // 4. 获取全局 Merkle 树和根
     let tree = state.merkle_tree.lock().await;
-    let proof = tree.proof(&indices);
-    let proof_bytes = bincode::serialize(&proof).unwrap_or_default();
     let root = tree.root().unwrap_or_default();
 
     // ===================== 返回带证明的结果 =====================
     Json(serde_json::json!({
         "page": page,
         "limit": limit,
-        "keys": page_result.iter().map(|k| hex::encode(k)).collect::<Vec<_>>(),
+                "pairs": page_result.iter().map(|(k, v)| serde_json::json!({
+            "key": k,
+            "value": v
+        })).collect::<Vec<_>>(),
         "merkle_root": hex::encode(root),
-        "proof": hex::encode(proof_bytes),
+        "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
+        "leaf_indices": indices,
     }))
     .into_response()
-    // (StatusCode::OK, "page success")
 }

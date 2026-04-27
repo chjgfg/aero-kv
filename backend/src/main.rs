@@ -23,10 +23,10 @@ use log::info;
 use rs_merkle::{MerkleTree, algorithms::Sha256};
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-
+use tokio::sync::Mutex;
 // 给 ChainClient 加 Arc 包装，满足 Clone 约束（Axum State 要求 Clone）
 // 1. 给两个状态都包上 Arc（满足 Clone + Send + Sync + 'static）
 pub type ChainState = Arc<ChainClient>;

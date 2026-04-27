@@ -25,8 +25,8 @@ pub fn bytes_to_str(event: &KVEvent) -> Result<(String, String)> {
     Ok((key, value))
 }
 
-pub fn calc_merkle_root(state: Arc<AppState>) -> Result<[u8; 32]> {
-    let disk = state.storage.lock().unwrap();
+pub async fn calc_merkle_root(state: Arc<AppState>) -> Result<[u8; 32]> {
+    let disk = state.storage.lock().await;
     // 1. 拿所有 key
     let keys = disk.get_keys().map_err(|_| Error::InvalidKey)?;
     // 2. 创建叶子（对每个 key 做哈希）
@@ -35,7 +35,7 @@ pub fn calc_merkle_root(state: Arc<AppState>) -> Result<[u8; 32]> {
     let tree = MerkleTree::<Sha256>::from_leaves(&leaves);
     let root = tree.root().unwrap_or([0u8; 32]);
     // 4. 更新全局状态（必须先 lock()）
-    *state.merkle_tree.lock().unwrap() = tree;
-    *state.leaf_hashes.lock().unwrap() = leaves;
+    *state.merkle_tree.lock().await = tree;
+    *state.leaf_hashes.lock().await = leaves;
     Ok(root)
 }

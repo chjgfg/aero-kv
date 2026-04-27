@@ -1,3 +1,5 @@
+import { verifyBatchProof, verifySingleProof } from "./merkle";
+
 const health = async () => {
     const res = await fetch("http://192.168.40.131/health");
     const data = await res.json();
@@ -146,6 +148,9 @@ const gets = async (key: string) => {
 
         // 解析 JSON
         const data = await res.json();
+        const isValid = await verifySingleProof(data);
+        console.log(`✅ Merkle 验证结果: ${isValid ? '通过（数据未被篡改）' : '失败（数据被篡改）'}`);
+
         console.log("✅ 成功收到数据:", data);
         return data;
     } catch (err) {
@@ -172,6 +177,10 @@ const scan = async (key: string, limit: number) => {
     }
 
     const data = await res.json();
+    // 2. 批量 Merkle 验证
+    const allValid = await verifyBatchProof(data);
+    console.log(`✅ Merkle 验证结果: ${allValid ? '通过（数据未被篡改）' : '失败（数据被篡改）'}`);
+
     console.log(data);
     return data;
 }
@@ -194,6 +203,9 @@ const page = async (page: number, limit: number) => {
     }
 
     const data = await res.json();
+    const allValid = await verifyBatchProof(data);
+    console.log(`✅ Merkle 验证结果: ${allValid ? '通过（数据未被篡改）' : '失败（数据被篡改）'}`);
+
     console.log(data);
     return data;
 }

@@ -38,8 +38,12 @@ pub struct KVQuery {
 pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     info!("init storage");
     let chain = state.chain.clone();
-    let Ok(res) = block_chain::init_storage(chain).await else{
-        return (StatusCode::BAD_REQUEST, "init storage error").into_response();
+    let Ok(res) = block_chain::init_storage(chain).await else {
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "init storage error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     // 创建第一棵树
     let _ = utils::calc_merkle_root(state).await;
@@ -60,7 +64,11 @@ pub async fn upsert(
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
     let Ok(res) = block_chain::upsert(chain, storage, k, v).await else {
-        return (StatusCode::BAD_REQUEST, "upsert error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "upsert error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     //  重建树
     let _ = utils::calc_merkle_root(state).await;
@@ -79,8 +87,12 @@ pub async fn delete(
     let chain = state.chain.clone();
     let storage = state.storage.clone();
     let k = req.key.into_bytes();
-     let Ok(res) = block_chain::delete(chain, storage, k).await else {
-        return (StatusCode::BAD_REQUEST, "delete error").into_response();
+    let Ok(res) = block_chain::delete(chain, storage, k).await else {
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "delete error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     // 重建树
     let _ = utils::calc_merkle_root(state).await;
@@ -107,7 +119,7 @@ pub async fn gets(
                 "status": "error",
                 "signature": e.to_string()
             });
-            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json_response)).into_response()
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json_response)).into_response();
         }
     };
 
@@ -118,22 +130,34 @@ pub async fn gets(
     let key_hash = Sha256::hash(&k);
 
     // 5. 查找 key 在 Merkle 树中的位置（索引）
-    let Some(index) = leaf_hashes.iter().position(|hash| hash == &key_hash) else {
-        return (StatusCode::NOT_FOUND, "key not in merkle tree").into_response();
+    // 3. 找不到索引
+    let Some(index) = leaf_hashes.iter().position(|h| h == &key_hash) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({
+                "status": "error",
+                "msg": "key not in merkle tree"
+            })),
+        )
+            .into_response();
     };
 
     // 6. 获取全局 Merkle 树
     // 5. 获取树和根
     let tree = state.merkle_tree.lock().await;
+    let proof = tree.proof(&[index].to_vec()); // 生成 Merkle 证明路径
+    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
     let root = tree.root().unwrap_or_default();
 
     // 6. 不序列化 proof，直接返回验证所需的信息
     let json_response = serde_json::json!({
+        "status": "success",
         "key": req.key,
         "value": hex::encode(value),
         "merkle_root": hex::encode(root),
         "key_hash": hex::encode(key_hash),
         "leaf_index": index,
+        "proof": proof_bytes,
     });
     (StatusCode::OK, Json(json_response)).into_response()
 }
@@ -157,7 +181,7 @@ pub async fn scan(
                 "status": "error",
                 "signature": e.to_string()
             });
-            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response()
+            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
         }
     };
     // ===================== 新增 Merkle 证明部分 =====================
@@ -179,10 +203,13 @@ pub async fn scan(
 
     // 4. 读取全局 Merkle 树，生成批量证明
     let tree = state.merkle_tree.lock().await;
+    let proof = tree.proof(&indices); // 生成 Merkle 证明路径
+    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
     let root = tree.root().unwrap_or_default();
 
     // 5. 返回批量验证所需的信息
     let json_response = serde_json::json!({
+        "status": "success",
         "pairs": scan_result.iter().map(|(k, v)| serde_json::json!({
             "key": k,
             "value": v
@@ -190,6 +217,7 @@ pub async fn scan(
         "merkle_root": hex::encode(root),
         "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
         "leaf_indices": indices,
+        "proof": proof_bytes,
     });
     (StatusCode::OK, Json(json_response)).into_response()
 }
@@ -213,7 +241,7 @@ pub async fn page(
                 "status": "error",
                 "signature": e.to_string()
             });
-            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response()
+            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
         }
     };
 
@@ -234,10 +262,13 @@ pub async fn page(
 
     // 4. 获取全局 Merkle 树和根
     let tree = state.merkle_tree.lock().await;
+    let proof = tree.proof(&indices);
+    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
     let root = tree.root().unwrap_or_default();
 
     // ===================== 返回带证明的结果 =====================
     let json_response = serde_json::json!({
+        "status": "success",
         "page": page,
         "limit": limit,
         "pairs": page_result.iter().map(|(k, v)| serde_json::json!({
@@ -247,6 +278,7 @@ pub async fn page(
         "merkle_root": hex::encode(root),
         "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
         "leaf_indices": indices,
+        "proof": proof_bytes,
     });
     (StatusCode::OK, Json(json_response)).into_response()
 }

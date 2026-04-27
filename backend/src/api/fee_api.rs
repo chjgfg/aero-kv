@@ -18,7 +18,11 @@ pub async fn init_fee(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     info!("init fee");
     let chain = state.chain.clone();
     let Ok(res) = fee::init_fee(chain).await else {
-        return (StatusCode::BAD_REQUEST, "init fee error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "init fee error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     let json_response = serde_json::json!({
         "status": "success",
@@ -38,7 +42,11 @@ pub async fn set_fee(
     let chain = state.chain.clone();
     let Ok(res) = fee::set_fee(chain, req.base_fee, req.fee_per_byte, req.scan_fee_per_item).await
     else {
-        return (StatusCode::BAD_REQUEST, "set fee error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "set fee error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     let json_response = serde_json::json!({
         "status": "success",

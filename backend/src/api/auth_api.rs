@@ -1,6 +1,9 @@
 // # set_admin / set_pause 接口
 use axum::{
-    Json, extract::{Query, State}, http::StatusCode, response::IntoResponse
+    Json,
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
 };
 use log::info;
 use solana_sdk::pubkey::Pubkey;
@@ -19,7 +22,11 @@ pub async fn init_auth(State(state): State<Arc<AppState>>) -> impl IntoResponse 
     info!("init auth");
     let chain = state.chain.clone();
     let Ok(res) = auth::init_auth(chain).await else {
-        return (StatusCode::UNAUTHORIZED, "init auth error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "init auth error",
+        });
+        return (StatusCode::UNAUTHORIZED, Json(json_response)).into_response();
     };
     let json_response = serde_json::json!({
         "status": "success",
@@ -33,13 +40,21 @@ pub async fn set_admin(
     Query(req): Query<AuthQuery>,
 ) -> impl IntoResponse {
     let Ok(new_admin) = req.new_admin.ok_or(|e| Error::InvalidParam(e)) else {
-        return (StatusCode::BAD_REQUEST, "set admin error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "set admin error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     info!("set admin new_admin: {}", new_admin);
     let chain = state.chain.clone();
     let pubkey = Pubkey::from_str(new_admin.as_str()).unwrap();
     let Ok(res) = auth::set_admin(chain, pubkey).await else {
-        return (StatusCode::NOT_MODIFIED, "set admin error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "set admin error",
+        });
+        return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
     };
     (StatusCode::OK, res.to_string()).into_response()
 }
@@ -54,7 +69,11 @@ pub async fn set_pause(
     info!("set pause paused: {}", paused);
     let chain = state.chain.clone();
     let Ok(res) = auth::set_pause(chain, paused).await else {
-        return (StatusCode::NOT_MODIFIED, "set pause error").into_response();
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "set pause error",
+        });
+        return (StatusCode::NOT_MODIFIED, Json(json_response)).into_response();
     };
     let json_response = serde_json::json!({
         "status": "success",

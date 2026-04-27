@@ -25,13 +25,11 @@ use log::info;
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::{
     commitment_config::CommitmentConfig, instruction::AccountMeta, pubkey::Pubkey,
-    signature::Signer, system_program,
+    signature::{Signature, Signer}, system_program,
 };
 
-// static GLOBAL_KEYS: Lazy<Mutex<Vec<Vec<u8>>>> = Lazy::new(|| Mutex::new(Vec::new()));
-
 /// 初始化存储
-pub async fn init_storage(chain: Arc<ChainClient>) -> Result<()> {
+pub async fn init_storage(chain: Arc<ChainClient>) -> Result<Signature> {
     info!("backend init storage...");
     // 新版合约需要的 PDA
     let (meta_pda, _) = chain.find_pda(META_SEEDS);
@@ -82,8 +80,9 @@ pub async fn init_storage(chain: Arc<ChainClient>) -> Result<()> {
         })
         .await
         .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?;
-    info!("初始化完成，签名: {}", signature_result?);
-    Ok(())
+    let signature = signature_result?;
+    info!("初始化完成，签名: {}", signature);
+    Ok(signature)
 }
 
 /// 插入或者修改
@@ -92,7 +91,7 @@ pub async fn upsert(
     storage: Arc<Mutex<DiskClient>>,
     key: Vec<u8>,
     value: Vec<u8>,
-) -> Result<()> {
+) -> Result<Signature> {
     info!("backend upsert key: {:?}, value: {:?}", key, value);
 
     // 只保留合约真正需要的 PDA
@@ -172,7 +171,7 @@ pub async fn upsert(
     };
 
     log::info!("upsert 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature)
 }
 
 pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<String> {
@@ -245,7 +244,7 @@ pub async fn delete(
     chain: Arc<ChainClient>,
     storage: Arc<Mutex<DiskClient>>,
     key: Vec<u8>,
-) -> Result<()> {
+) -> Result<Signature> {
     info!("backend delete key: {:?}", key);
 
     let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, key.as_slice()]);
@@ -312,7 +311,7 @@ pub async fn delete(
     };
 
     info!("delete 成功: {}", signature);
-    Ok(())
+    Ok(signature)
 }
 
 pub async fn scan(

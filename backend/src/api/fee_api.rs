@@ -17,8 +17,14 @@ pub struct FeeRequest {
 pub async fn init_fee(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     info!("init fee");
     let chain = state.chain.clone();
-    let _ = fee::init_fee(chain).await;
-    (StatusCode::OK, "init fee success")
+    let Ok(res) = fee::init_fee(chain).await else {
+        return (StatusCode::BAD_REQUEST, "init fee error").into_response();
+    };
+    let json_response = serde_json::json!({
+        "status": "success",
+        "signature": res.to_string()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn set_fee(
@@ -30,6 +36,13 @@ pub async fn set_fee(
         req.base_fee, req.fee_per_byte, req.scan_fee_per_item
     );
     let chain = state.chain.clone();
-    let _ = fee::set_fee(chain, req.base_fee, req.fee_per_byte, req.scan_fee_per_item).await;
-    (StatusCode::OK, "set fee success")
+    let Ok(res) = fee::set_fee(chain, req.base_fee, req.fee_per_byte, req.scan_fee_per_item).await
+    else {
+        return (StatusCode::BAD_REQUEST, "set fee error").into_response();
+    };
+    let json_response = serde_json::json!({
+        "status": "success",
+        "signature": res.to_string()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }

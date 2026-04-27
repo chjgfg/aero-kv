@@ -9,10 +9,10 @@ use crate::{
 };
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use solana_sdk::{pubkey::Pubkey, signature::Signer, system_program};
+use solana_sdk::{pubkey::Pubkey, signature::{Signature, Signer}, system_program};
 
 /// 初始化权限
-pub async fn init_auth(chain: Arc<ChainClient>,) -> Result<()> {
+pub async fn init_auth(chain: Arc<ChainClient>,) -> Result<Signature> {
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
     let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::InitAuth {
@@ -44,11 +44,11 @@ pub async fn init_auth(chain: Arc<ChainClient>,) -> Result<()> {
         }
     };
     log::info!("init_auth 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature.0)
 }
 
 /// 重置权限
-pub async fn set_admin(chain: Arc<ChainClient>, new_admin: Pubkey) -> Result<()> {
+pub async fn set_admin(chain: Arc<ChainClient>, new_admin: Pubkey) -> Result<Signature> {
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
     let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::SetAdmin {
@@ -80,11 +80,11 @@ pub async fn set_admin(chain: Arc<ChainClient>, new_admin: Pubkey) -> Result<()>
         }
     };
     log::info!("set_admin 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature.0)
 }
 
 /// 暂停/开启合约
-pub async fn set_pause(chain: Arc<ChainClient>, paused: bool) -> Result<()> {
+pub async fn set_pause(chain: Arc<ChainClient>, paused: bool) -> Result<Signature> {
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
     let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::SetPause {
@@ -116,5 +116,5 @@ pub async fn set_pause(chain: Arc<ChainClient>, paused: bool) -> Result<()> {
         }
     };
     log::info!("set_pause 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature.0)
 }

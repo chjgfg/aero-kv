@@ -14,6 +14,7 @@ const initAuth = async () => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -27,6 +28,7 @@ const setAuth = async (new_admin: string) => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -40,6 +42,7 @@ const setPause = async (paused: boolean) => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -53,6 +56,7 @@ const initFee = async () => {
         }
     });
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -75,6 +79,7 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
     }
 
     const data = await res.json();
+    console.log(data);
     return data;
 }
 
@@ -130,13 +135,23 @@ const deleted = async (key: string) => {
 }
 
 const gets = async (key: string) => {
-    // 将参数拼接到 URL 后面
-    const url = `http://192.168.40.131/kv/get?key=${key}`;
-    const res = await fetch(url);
-    const data = await res.json();
-    console.log(data);
-    return data;
-}
+    try {
+        const url = `http://192.168.40.131/kv/get?key=${key}`;
+        const res = await fetch(url);
+
+        // 先判断 HTTP 状态码，非 200 直接抛出错误
+        if (!res.ok) {
+            throw new Error(`HTTP 错误: ${res.status} ${res.statusText}`);
+        }
+
+        // 解析 JSON
+        const data = await res.json();
+        console.log("✅ 成功收到数据:", data);
+        return data;
+    } catch (err) {
+        console.error("❌ 请求失败:", err);
+    }
+};
 
 const scan = async (key: string, limit: number) => {
     const res = await fetch("http://192.168.40.131/kv/scan", {

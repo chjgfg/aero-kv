@@ -11,10 +11,10 @@ use crate::{
 };
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use solana_sdk::{signature::Signer, system_program};
+use solana_sdk::{signature::{Signature, Signer}, system_program};
 
 /// 初始化费用
-pub async fn init_fee(chain: Arc<ChainClient>) -> Result<()> {
+pub async fn init_fee(chain: Arc<ChainClient>) -> Result<Signature> {
     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
     let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
     let accounts = accounts::InitFee {
@@ -46,7 +46,7 @@ pub async fn init_fee(chain: Arc<ChainClient>) -> Result<()> {
         }
     };
     log::info!("init_fee 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature.0)
 }
 
 /// 重置权限
@@ -55,7 +55,7 @@ pub async fn set_fee(
     base_fee: u64,
     fee_per_byte: u64,
     scan_fee_per_item: u64,
-) -> Result<()> {
+) -> Result<Signature> {
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
     let admin = chain.payer.try_pubkey().map_err(|_| Error::PubKeyError)?;
@@ -93,5 +93,5 @@ pub async fn set_fee(
         }
     };
     log::info!("set_fee 成功，签名: {:?}", signature);
-    Ok(())
+    Ok(signature.0)
 }

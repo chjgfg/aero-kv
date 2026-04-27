@@ -38,10 +38,16 @@ pub struct KVQuery {
 pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     info!("init storage");
     let chain = state.chain.clone();
-    let _ = block_chain::init_storage(chain).await;
+    let Ok(res) = block_chain::init_storage(chain).await else{
+        return (StatusCode::BAD_REQUEST, "init storage error").into_response();
+    };
     // 创建第一棵树
     let _ = utils::calc_merkle_root(state).await;
-    (StatusCode::OK, "init storage success")
+    let json_response = serde_json::json!({
+        "status": "success",
+        "signature": res.to_string()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn upsert(
@@ -53,10 +59,16 @@ pub async fn upsert(
     let storage = state.storage.clone();
     let k = req.key.into_bytes();
     let v = req.value.into_bytes();
-    let _ = block_chain::upsert(chain, storage, k, v).await;
+    let Ok(res) = block_chain::upsert(chain, storage, k, v).await else {
+        return (StatusCode::BAD_REQUEST, "upsert error").into_response();
+    };
     //  重建树
     let _ = utils::calc_merkle_root(state).await;
-    (StatusCode::OK, "upsert success")
+    let json_response = serde_json::json!({
+        "status": "success",
+        "signature": res.to_string()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn delete(
@@ -67,10 +79,16 @@ pub async fn delete(
     let chain = state.chain.clone();
     let storage = state.storage.clone();
     let k = req.key.into_bytes();
-    let _ = block_chain::delete(chain, storage, k).await;
+     let Ok(res) = block_chain::delete(chain, storage, k).await else {
+        return (StatusCode::BAD_REQUEST, "delete error").into_response();
+    };
     // 重建树
     let _ = utils::calc_merkle_root(state).await;
-    (StatusCode::OK, "delete success")
+    let json_response = serde_json::json!({
+        "status": "success",
+        "signature": res.to_string()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn gets(
@@ -83,8 +101,14 @@ pub async fn gets(
     // let _ = block_chain::get(chain, k).await;
     let value = match block_chain::get(chain, k.clone()).await {
         Ok(v) => v,
-        Ok(_) => return (StatusCode::NOT_FOUND, "key not found").into_response(),
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "storage error").into_response(),
+        // Ok(None) => return (StatusCode::NOT_FOUND, "key not found").into_response(),
+        Err(e) => {
+            let json_response = serde_json::json!({
+                "status": "error",
+                "signature": e.to_string()
+            });
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json(json_response)).into_response()
+        }
     };
 
     // 3. 获取全局的叶子哈希列表（用来找索引）
@@ -104,14 +128,14 @@ pub async fn gets(
     let root = tree.root().unwrap_or_default();
 
     // 6. 不序列化 proof，直接返回验证所需的信息
-    Json(serde_json::json!({
+    let json_response = serde_json::json!({
         "key": req.key,
         "value": hex::encode(value),
         "merkle_root": hex::encode(root),
         "key_hash": hex::encode(key_hash),
         "leaf_index": index,
-    }))
-    .into_response()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn scan(
@@ -127,7 +151,14 @@ pub async fn scan(
     // 1. 先拿到 scan 的结果（保持你原来的调用方式）
     let scan_result = match block_chain::scan(chain, storage.clone(), key, l).await {
         Ok(keys) => keys, // 假设这里返回 Vec<Vec<u8>>
-        Err(e) => return (StatusCode::BAD_REQUEST, format!("scan failed: {}", e)).into_response(),
+        // Err(e) => return (StatusCode::BAD_REQUEST, format!("scan failed: {}", e)).into_response(),
+        Err(e) => {
+            let json_response = serde_json::json!({
+                "status": "error",
+                "signature": e.to_string()
+            });
+            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response()
+        }
     };
     // ===================== 新增 Merkle 证明部分 =====================
     // 2. 读取全局叶子哈希列表
@@ -151,7 +182,7 @@ pub async fn scan(
     let root = tree.root().unwrap_or_default();
 
     // 5. 返回批量验证所需的信息
-    Json(serde_json::json!({
+    let json_response = serde_json::json!({
         "pairs": scan_result.iter().map(|(k, v)| serde_json::json!({
             "key": k,
             "value": v
@@ -159,8 +190,8 @@ pub async fn scan(
         "merkle_root": hex::encode(root),
         "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
         "leaf_indices": indices,
-    }))
-    .into_response()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }
 
 pub async fn page(
@@ -176,7 +207,14 @@ pub async fn page(
     // 1. 拿到分页结果（保持你原来的调用方式）
     let page_result = match block_chain::page(chain, storage, page, limit).await {
         Ok(keys) => keys, // 假设这里返回 Vec<Vec<u8>>
-        Err(e) => return (StatusCode::BAD_REQUEST, format!("page failed: {}", e)).into_response(),
+        // Err(e) => return (StatusCode::BAD_REQUEST, format!("page failed: {}", e)).into_response(),
+        Err(e) => {
+            let json_response = serde_json::json!({
+                "status": "error",
+                "signature": e.to_string()
+            });
+            return (StatusCode::BAD_REQUEST, Json(json_response)).into_response()
+        }
     };
 
     // ===================== 新增 Merkle 证明部分 =====================
@@ -199,16 +237,16 @@ pub async fn page(
     let root = tree.root().unwrap_or_default();
 
     // ===================== 返回带证明的结果 =====================
-    Json(serde_json::json!({
+    let json_response = serde_json::json!({
         "page": page,
         "limit": limit,
-                "pairs": page_result.iter().map(|(k, v)| serde_json::json!({
+        "pairs": page_result.iter().map(|(k, v)| serde_json::json!({
             "key": k,
             "value": v
         })).collect::<Vec<_>>(),
         "merkle_root": hex::encode(root),
         "key_hashes": key_hashes.iter().map(|h| hex::encode(h)).collect::<Vec<_>>(),
         "leaf_indices": indices,
-    }))
-    .into_response()
+    });
+    (StatusCode::OK, Json(json_response)).into_response()
 }

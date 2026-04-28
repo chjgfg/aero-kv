@@ -9,5 +9,8 @@ pub const FEE_SEEDS: &[&[u8]] = &["fee".as_bytes()];
 // pub const NODE_SEEDS: &[u8] = "node".as_bytes();
 pub const VALUE_SEEDS: &[u8] = "value".as_bytes();
 
+// 后端代码里，和 VALUE_SEEDS 同级定义
+pub const COUNTER_SEEDS: &[&[u8]] = &["counter".as_bytes()];
+
 // 必须和合约一致
 // pub const MAX_LEVEL: usize = 8;

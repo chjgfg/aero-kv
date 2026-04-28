@@ -4,19 +4,19 @@
 
 // # set_admin, set_pause, 权限校验
 
-use std::sync::{Arc};
-use tokio::sync::Mutex;
 use crate::{
     block_chain::{
         client::ChainClient,
-        types::{KVEvent, ValueAccount},
+        types::{KVEvent, KvCounter, ValueAccount},
     },
-    constants::{AUTH_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, VALUE_SEEDS},
+    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, VALUE_SEEDS},
     error::{Error, Result},
     storage::engine::DiskClient,
     utils::bytes_to_str,
 };
 use anchor_client::anchor_lang::prelude::borsh::BorshDeserialize;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 use base64::{Engine, engine::general_purpose};
 use contract::accounts; // 👈 用你的合约名
@@ -24,8 +24,11 @@ use contract::instruction;
 use log::info;
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::{
-    commitment_config::CommitmentConfig, instruction::AccountMeta, pubkey::Pubkey,
-    signature::{Signature, Signer}, system_program,
+    commitment_config::CommitmentConfig,
+    instruction::AccountMeta,
+    pubkey::Pubkey,
+    signature::{Signature, Signer},
+    system_program,
 };
 
 /// 初始化存储
@@ -85,6 +88,57 @@ pub async fn init_storage(chain: Arc<ChainClient>) -> Result<Signature> {
     Ok(signature)
 }
 
+pub async fn init_counter(chain: Arc<ChainClient>) -> Result<Signature> {
+    info!("backend init counter...");
+    // 新版合约需要的 PDA
+    let (counter_pda, _) = chain.find_pda(COUNTER_SEEDS);
+    info!("backend upsert counter pda: {}", counter_pda);
+
+    let admin = chain.payer.pubkey();
+
+    // 账户完全匹配新版合约
+    let accounts = accounts::InitCounter {
+        signer: admin,
+        counter: counter_pda,
+        system_program: system_program::ID,
+    };
+
+    let args = instruction::InitCounter {};
+
+    let signature_result: Result<solana_sdk::signature::Signature> =
+        tokio::task::spawn_blocking(move || {
+            let program = chain.program()?;
+
+            let sig = program
+                .request()
+                .args(args)
+                .accounts(accounts)
+                .send()
+                .map_err(|e| {
+                    log::error!("init counter 失败: {:?}", e);
+                    Error::RpcError(format!("init 失败: {e}"))
+                })?;
+
+            // 等待交易确认
+            let mut retries = 0;
+            while retries < 10 {
+                if let Some(Ok(_)) = chain.rpc_client.get_signature_status(&sig).unwrap_or(None) {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(500));
+                retries += 1;
+            }
+
+            log::info!("init_counter 成功: {}", sig);
+            Ok(sig)
+        })
+        .await
+        .map_err(|e| Error::RpcError(format!("任务执行失败: {e}")))?;
+    let signature = signature_result?;
+    info!("初始化完成，签名: {}", signature);
+    Ok(signature)
+}
+
 /// 插入或者修改
 pub async fn upsert(
     chain: Arc<ChainClient>,
@@ -102,6 +156,9 @@ pub async fn upsert(
     info!("backend upsert auth pda: {}", auth_pda);
     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
     info!("backend upsert fee pda: {}", fee_pda);
+    // ✅ 新增：获取计数器的 PDA
+    let (counter_pda, _) = chain.find_pda(COUNTER_SEEDS);
+    info!("backend upsert counter pda: {}", counter_pda);
 
     {
         let mut disk = storage.lock().await;
@@ -117,6 +174,7 @@ pub async fn upsert(
         auth_config: auth_pda,
         fee_config: fee_pda,
         treasury: chain.treasury,
+        counter: counter_pda,
         system_program: system_program::ID,
     };
 
@@ -253,6 +311,9 @@ pub async fn delete(
     info!("backend delete auth pda: {}", auth_pda);
     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
     info!("backend delete fee pda: {}", fee_pda);
+    // ✅ 新增：获取计数器的 PDA
+    let (counter_pda, _) = chain.find_pda(COUNTER_SEEDS);
+    info!("backend delete counter pda: {}", counter_pda);
 
     {
         let mut disk = storage.lock().await;
@@ -267,6 +328,7 @@ pub async fn delete(
         auth_config: auth_pda,
         fee_config: fee_pda,
         treasury: chain.treasury,
+        counter: counter_pda,
         system_program: system_program::ID,
     };
 
@@ -421,7 +483,6 @@ pub async fn scan(
     };
     info!("scan 交易成功: {}", signature);
 
-
     // ==============================
     // 用你的 RpcClient 直接获取交易日志（零报错版）
     // ==============================
@@ -491,16 +552,27 @@ pub async fn scan(
     Ok(results)
 }
 
-pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page: usize, limit: usize) -> Result<Vec<(String, String)>> {
+pub async fn page(
+    chain: Arc<ChainClient>,
+    storage: Arc<Mutex<DiskClient>>,
+    page: usize,
+    limit: usize,
+) -> Result<(Vec<(String, String)>, u64)> {
     info!("backend page offset: {:?}, limit: {}", page, limit);
 
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
     info!("backend page auth pda: {}", auth_pda);
     let (fee_pda, _) = chain.find_pda(FEE_SEEDS);
     info!("backend page fee pda: {}", fee_pda);
+    let (counter_pda, _) = chain.find_pda(COUNTER_SEEDS); // 👈 加 counter
+    info!("backend page counter pda: {}", counter_pda);
+    // ✅ 新增：获取计数器的 PDA
+    let (counter_pda, _) = chain.find_pda(COUNTER_SEEDS);
+    info!("backend delete counter pda: {}", counter_pda);
     let admin = chain.payer.pubkey();
 
     let client_for_tx = Arc::new(chain.clone());
+    let client_for_counter = Arc::new(chain.clone());
 
     // 账户匹配新版合约
     let accounts = accounts::Page {
@@ -508,9 +580,9 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
         auth_config: auth_pda,
         fee_config: fee_pda,
         treasury: chain.treasury,
+        counter: counter_pda,
         system_program: system_program::ID,
     };
-
 
     // ======================================================================
     // 🔥 核心：scan 只需要把【你要扫描的 ValueAccount PDA】放进 remaining_accounts
@@ -527,11 +599,9 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
 
     // 把 key 列表通过指令数据传给合约
     let keys: Vec<Vec<u8>> = page_data.iter().map(|(k, _)| k.clone()).collect();
-    let args = instruction::Page {
-        keys,
-    };
+    let args = instruction::Page { keys };
 
-     // ==============================
+    // ==============================
     // 生成所有 ValueAccount PDA
     // 传给合约做范围查询
     // ==============================
@@ -584,7 +654,6 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
     };
     info!("scan 交易成功: {}", signature);
 
-
     // ==============================
     // 用你的 RpcClient 直接获取交易日志（零报错版）
     // ==============================
@@ -612,6 +681,8 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
     for log in &logs {
         info!("{}", log);
     }
+
+    let mut total_from_log: Option<u64> = None;
 
     // 解析事件
     let mut results: Vec<(String, String)> = Vec::new();
@@ -646,10 +717,25 @@ pub async fn page(chain: Arc<ChainClient>, storage: Arc<Mutex<DiskClient>>, page
                 }
             }
         }
+
+        // 2. 新增：解析我们在合约里手动打印的 total
+        if log.contains("FINAL_TOTAL: ") {
+            if let Some(total_str) = log.split("FINAL_TOTAL: ").last() {
+                if let Ok(t) = total_str.trim().parse::<u64>() {
+                    total_from_log = Some(t);
+                    info!("从日志中同步获取到最新 Total: {}", t);
+                }
+            }
+        }
     }
 
     info!("扫描完成，{:?}", results);
     info!("扫描完成，共 {} 条数据", results.len());
+    info!("扫描完成，共 {:?} 条数据", total_from_log);
 
-    Ok(results)
+    // ======================================================
+    // 🔥 关键：每次读取 total 都新建客户端，彻底避免缓存
+    // ======================================================
+    let total = total_from_log.ok_or_else(|| {Error::RpcError("counter account not found".to_string())})?;
+    Ok((results, total))
 }

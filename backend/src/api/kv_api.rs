@@ -9,6 +9,7 @@ use axum::{
 };
 use log::info;
 use rs_merkle::{Hasher as _, algorithms::Sha256};
+use serde_json::json;
 
 use crate::{
     AppState,
@@ -52,6 +53,35 @@ pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoRespon
         "signature": res.to_string()
     });
     (StatusCode::OK, Json(json_response)).into_response()
+}
+
+// 新增一个接口，专门用来初始化计数器
+pub async fn init_counter(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    info!("init counter");
+    let chain = state.chain.clone();
+
+    match block_chain::init_counter(chain).await {
+        Ok(sig) => {
+            return (
+                StatusCode::OK,
+                Json(json!({
+                    "status": "success",
+                    "signature": sig.to_string()
+                })),
+            )
+                .into_response();
+        }
+        Err(e) => {
+            log::error!("init counter failed: {:?}", e);
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(
+                    json!({ "status": "error", "message": format!("init counter failed: {}", e) }),
+                ),
+            )
+                .into_response();
+        }
+    }
 }
 
 pub async fn upsert(
@@ -146,14 +176,18 @@ pub async fn gets(
     // 5. 获取树和根
     let tree = state.merkle_tree.lock().await;
     let proof = tree.proof(&[index].to_vec()); // 生成 Merkle 证明路径
-    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
+    let proof_bytes: Vec<String> = proof
+        .proof_hashes()
+        .iter()
+        .map(|h| hex::encode(h))
+        .collect();
     let root = tree.root().unwrap_or_default();
 
     // 6. 不序列化 proof，直接返回验证所需的信息
     let json_response = serde_json::json!({
         "status": "success",
         "key": req.key,
-        "value": hex::encode(value),
+        "value": value,
         "merkle_root": hex::encode(root),
         "key_hash": hex::encode(key_hash),
         "leaf_index": index,
@@ -204,7 +238,11 @@ pub async fn scan(
     // 4. 读取全局 Merkle 树，生成批量证明
     let tree = state.merkle_tree.lock().await;
     let proof = tree.proof(&indices); // 生成 Merkle 证明路径
-    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
+    let proof_bytes: Vec<String> = proof
+        .proof_hashes()
+        .iter()
+        .map(|h| hex::encode(h))
+        .collect();
     let root = tree.root().unwrap_or_default();
 
     // 5. 返回批量验证所需的信息
@@ -233,7 +271,7 @@ pub async fn page(
     let limit: usize = req.limit;
     // let _ = block_chain::page(chain, storage, o, l).await;
     // 1. 拿到分页结果（保持你原来的调用方式）
-    let page_result = match block_chain::page(chain, storage, page, limit).await {
+    let result = match block_chain::page(chain, storage, page, limit).await {
         Ok(keys) => keys, // 假设这里返回 Vec<Vec<u8>>
         // Err(e) => return (StatusCode::BAD_REQUEST, format!("page failed: {}", e)).into_response(),
         Err(e) => {
@@ -244,6 +282,8 @@ pub async fn page(
             return (StatusCode::BAD_REQUEST, Json(json_response)).into_response();
         }
     };
+    let page_result = result.0;
+    let counter = result.1;
 
     // ===================== 新增 Merkle 证明部分 =====================
     let leaf_hashes = state.leaf_hashes.lock().await;
@@ -263,7 +303,11 @@ pub async fn page(
     // 4. 获取全局 Merkle 树和根
     let tree = state.merkle_tree.lock().await;
     let proof = tree.proof(&indices);
-    let proof_bytes: Vec<String> = proof.proof_hashes().iter().map(|h| hex::encode(h)).collect();
+    let proof_bytes: Vec<String> = proof
+        .proof_hashes()
+        .iter()
+        .map(|h| hex::encode(h))
+        .collect();
     let root = tree.root().unwrap_or_default();
 
     // ===================== 返回带证明的结果 =====================
@@ -271,6 +315,7 @@ pub async fn page(
         "status": "success",
         "page": page,
         "limit": limit,
+        "total": counter, // 🔥 这里返回链上真实总数！
         "pairs": page_result.iter().map(|(k, v)| serde_json::json!({
             "key": k,
             "value": v

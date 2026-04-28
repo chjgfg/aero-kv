@@ -2,11 +2,11 @@ use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
     constants::{
-        AUTH_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_VALUE_LEN, VALUE_SEEDS,
+        AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_VALUE_LEN, VALUE_SEEDS
     },
     error::Error,
     fee::FeeConfig,
-    storage::structs::ValueAccount,
+    storage::structs::{KvCounter, ValueAccount},
     utils::charge,
 };
 
@@ -34,7 +34,16 @@ pub struct Upsert<'info> {
     #[account(mut)]
     pub treasury: SystemAccount<'info>,
 
+    // ✅ 新增计数器账号
+    #[account(
+        mut,
+        seeds = [COUNTER_SEEDS], // 和后端的 COUNTER_SEEDS 完全一致
+        bump
+    )]
+    pub counter: Account<'info, KvCounter>,
+
     pub system_program: Program<'info, System>,
+
 }
 
 pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
@@ -57,9 +66,25 @@ pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> 
         fee,
     )?;
 
+    // ==============================================
+    // 🔴 关键：判断 key 是否是新增（通过 value_account 的状态）
+    // ==============================================
+    let is_new = ctx.accounts.value_account.data.is_empty();
+
     // 直接写入 ValueAccount
     let value_acc = &mut ctx.accounts.value_account;
     value_acc.data = value;
+
+    // ==============================================
+    // 🟢 如果是新增，计数器 +1
+    // ==============================================
+    msg!("is_new: {}", is_new);
+    msg!("counter pda: {}", ctx.accounts.counter.key());
+    if is_new {
+        let counter = &mut ctx.accounts.counter;
+        counter.total_count = counter.total_count.saturating_add(1);
+        msg!("upsert total_count: {}", counter.total_count);
+    }
 
     Ok(())
 }

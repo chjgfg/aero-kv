@@ -18,6 +18,10 @@ pub mod contract {
     pub fn init_storage(ctx: Context<InitStorage>) -> Result<()> {
         storage::init_storage(ctx)
     }
+    
+    pub fn init_counter(ctx: Context<InitCounter>) -> Result<()> {
+        storage::init_counter(ctx)
+    }
 
     pub fn get(ctx: Context<Get>, key: Vec<u8>) -> Result<Vec<u8>> {
         storage::get(ctx, key)

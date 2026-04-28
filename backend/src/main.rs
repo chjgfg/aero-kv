@@ -80,6 +80,7 @@ async fn main() -> Result<()> {
         .route("/health", get(api::health))
         // KV 接口
         .route("/kv/init-storage", post(api::init_storage))
+        .route("/kv/init-counter", post(api::init_counter))
         .route("/kv/upsert", post(api::upsert))
         .route("/kv/delete", delete(api::delete))
         .route("/kv/get", get(api::gets))

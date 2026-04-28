@@ -1,10 +1,10 @@
 use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
-    constants::{AUTH_SEEDS, FEE_SEEDS, VALUE_SEEDS},
+    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, VALUE_SEEDS},
     error::Error,
     fee::FeeConfig,
-    storage::structs::ValueAccount,
+    storage::structs::{KvCounter, ValueAccount},
     utils::charge,
 };
 
@@ -29,6 +29,14 @@ pub struct Delete<'info> {
 
     #[account(mut)]
     pub treasury: SystemAccount<'info>,
+
+    // ✅ 新增计数器账号
+    #[account(
+        mut,
+        seeds = [COUNTER_SEEDS], // 和后端的 COUNTER_SEEDS 完全一致
+        bump
+    )]
+    pub counter: Account<'info, KvCounter>,
 
     pub system_program: Program<'info, System>,
 }
@@ -55,5 +63,10 @@ pub fn delete(ctx: Context<Delete>, _key: Vec<u8>) -> Result<()> {
         .value_account
         .close(ctx.accounts.signer.to_account_info())?;
 
+    // 删除成功后计数器 -1
+    let counter = &mut ctx.accounts.counter;
+    counter.total_count = counter.total_count.saturating_sub(1);
+    msg!("delete total_count: {}", counter.total_count);
+    msg!("counter pda: {}", ctx.accounts.counter.key());
     Ok(())
 }

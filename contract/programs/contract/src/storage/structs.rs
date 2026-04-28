@@ -44,3 +44,8 @@ pub struct KVEvent {
     pub key: Vec<u8>,
     pub value: Vec<u8>,
 }
+
+#[account]
+pub struct KvCounter {
+    pub total_count: u64,  // 真实总条数
+}

@@ -18,7 +18,6 @@ async function sha256(bytes: Uint8Array): Promise<Uint8Array> {
 
 // ==============================
 // 【真正】批量验证（适配 scan / page 接口）
-// 支持后端返回的 proof 字段
 // ==============================
 async function verifyBatchProof(data: any): Promise<boolean> {
     try {
@@ -70,13 +69,15 @@ async function verifySingleProof(data: any): Promise<boolean> {
         let currentIndex = leafIndex;
 
         for (const proofHash of proofHashes) {
+            let combined: Uint8Array;
             if (currentIndex % 2 === 0) {
                 // 左节点，和 proof 里的右节点合并
-                currentHash = await sha256(new Uint8Array([...currentHash, ...proofHash]));
+                combined = new Uint8Array([...currentHash, ...proofHash]);
             } else {
                 // 右节点，和 proof 里的左节点合并
-                currentHash = await sha256(new Uint8Array([...proofHash, ...currentHash]));
+                combined = new Uint8Array([...proofHash, ...currentHash]);
             }
+            currentHash = await sha256(combined);
             currentIndex = Math.floor(currentIndex / 2);
         }
 

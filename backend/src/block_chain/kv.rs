@@ -7,7 +7,7 @@
 use crate::{
     block_chain::{
         client::ChainClient,
-        types::{KVEvent, KvCounter, ValueAccount},
+        types::{KVEvent, ValueAccount},
     },
     constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, VALUE_SEEDS},
     error::{Error, Result},
@@ -572,7 +572,7 @@ pub async fn page(
     let admin = chain.payer.pubkey();
 
     let client_for_tx = Arc::new(chain.clone());
-    let client_for_counter = Arc::new(chain.clone());
+    // let client_for_counter = Arc::new(chain.clone());
 
     // 账户匹配新版合约
     let accounts = accounts::Page {

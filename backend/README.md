@@ -19,16 +19,22 @@ curl -X DELETE http://localhost:8001/kv/delete?key=name1
 
 
 
-curl -X POST http://localhost:8001/auth/set-pause -H "Content-Type: application/json" -d "{\"paused\": true}"
-curl -X POST http://localhost:8001/auth/set-pause -H "Content-Type: application/json" -d "{\"paused\": false}"
+# 失效
+curl -X POST http://localhost:8001/auth/set-pause?paused=true
+# 生效
+curl -X POST http://localhost:8001/auth/set-pause?paused=false
 
 curl -X POST http://localhost:8001/fee/set-fee -H "Content-Type: application/json" -d "{\"op\": \"fee\", \"base_fee\": 100, \"fee_per_byte\": 100, \"scan_fee_per_item\": 100}"
 
 curl http://localhost:8001/kv/get?key=name1
 curl http://localhost:8003/kv/get?key=name1
+curl http://localhost:8003/kv/get?key=name2
+curl http://localhost:8002/kv/get?key=name1
 curl http://localhost:8002/kv/get?key=name2
 
 curl -X POST http://localhost:8001/kv/scan -H "Content-Type: application/json" -d "{\"key\": \"na\", \"value\": \"\", \"limit\": 10}"
+curl -X POST http://localhost:8002/kv/scan -H "Content-Type: application/json" -d "{\"key\": \"na\", \"value\": \"\", \"limit\": 10}"
+curl -X POST http://localhost:8003/kv/scan -H "Content-Type: application/json" -d "{\"key\": \"na\", \"value\": \"\", \"limit\": 10}"
 curl -X POST http://localhost:8001/kv/page -H "Content-Type: application/json" -d "{\"page\": 1, \"limit\": 10}"
 curl -X POST http://localhost:8002/kv/page -H "Content-Type: application/json" -d "{\"page\": 1, \"limit\": 10}"
 curl -X POST http://localhost:8003/kv/page -H "Content-Type: application/json" -d "{\"page\": 1, \"limit\": 10}"

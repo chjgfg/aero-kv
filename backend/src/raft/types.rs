@@ -10,6 +10,7 @@ pub enum KvOp {
     Upsert {
         key: String,
         value: String,
+        pda: Vec<u8> // 新增：由 API 层计算好传进来
     },
     Delete {
         key: String,

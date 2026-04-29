@@ -76,10 +76,11 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
         for entry in entries {
             if let openraft::EntryPayload::Normal(op) = entry.payload {
                 match op {
-                    KvOp::Upsert { key, value } => {
-                        let _ = db.set(key.into_bytes(), value.into_bytes());
-                        need_rebuild_tree = true; // 只要有写入，就标记需要重建
-                    }
+                    KvOp::Upsert { key, value: _, pda } => {
+                        // 关键修复：存入 pda 而不是 value
+                        let _ = db.set(key.into_bytes(), pda); 
+                        need_rebuild_tree = true;
+                    },
                     KvOp::Delete { key } => {
                         let _ = db.delete(key.into_bytes());
                         need_rebuild_tree = true; // 只要有写入，就标记需要重建

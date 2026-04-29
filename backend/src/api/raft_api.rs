@@ -13,15 +13,11 @@ use openraft::BasicNode;
 use rs_merkle::{Hasher as _, algorithms::Sha256};
 
 use crate::{
-    AppState,
-    api::{
+    AppState, api::{
         auth_api::AuthQuery,
         fee_api::FeeRequest,
         kv_api::{KVQuery, KVRequest, PageRequest},
-    },
-    auth, block_chain, fee,
-    raft::types::{KvOp, NodeId, RaftConfig},
-    utils::{self, ensure_leader_and_fresh},
+    }, auth, block_chain, constants::VALUE_SEEDS, fee, raft::types::{KvOp, NodeId, RaftConfig}, utils::{self, ensure_leader_and_fresh}
 };
 
 pub async fn raft_append(
@@ -63,22 +59,25 @@ pub async fn raft_upsert(
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
     info!("upsert key: {}, value: {}", req.key, req.value);
-
+    let chain = state.chain.clone();
+    let k = req.key.clone().into_bytes();
+    let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, k.as_slice()]);
     // 1. 构造 Raft 写操作提案
     let op = KvOp::Upsert {
         key: req.key.clone(),
         value: req.value.clone(),
+        pda: value_pda.to_bytes().to_vec(), // 传入 PDA 字节
     };
 
     // 2. 通过 Raft 提交提案。这一步会把日志同步到大多数节点
     // 只有 Leader 能执行此操作
+    // 这个发往 state_machine.rs
     match state.raft.client_write(op).await {
         Ok(_) => {
             // 3. Raft 日志同步成功后，再执行原有的链上逻辑[cite: 1]
             // 注意：此时状态机已经在各节点本地应用了数据，这里只需处理 Solana 交易反馈
             let chain = state.chain.clone();
             let storage = state.storage.clone();
-            let k = req.key.into_bytes();
             let v = req.value.into_bytes();
 
             match block_chain::upsert(chain, storage, k, v).await {

@@ -23,6 +23,7 @@ pub enum Error {
     LimitError,
     InvalidPageError,
     InvalidParam(String),
+    InternalError(String),
 }
 
 impl Display for Error {
@@ -44,6 +45,7 @@ impl Display for Error {
             Error::LimitError => write!(f, "Limit 输入 错误"),
             Error::InvalidPageError => write!(f, "输入 页码 错误"),
             Error::InvalidParam(msg)  => write!(f, "无效参数: {msg}"),
+            Error::InternalError(msg)  => write!(f, "从bitcask取数据报错: {msg}"),
         }
     }
 }

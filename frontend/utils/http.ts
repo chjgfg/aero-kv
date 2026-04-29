@@ -21,18 +21,18 @@ const initAuth = async () => {
     return data;
 }
 
-const setAuth = async (new_admin: string) => {
-    const url = `${API_BASE}/auth/set-admin?new_admin=${new_admin}`;
-    const res = await fetch(url, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        }
-    });
-    const data = await res.json();
-    console.log(data);
-    return data;
-}
+// const setAuth = async (new_admin: string) => {
+//     const url = `${API_BASE}/auth/set-admin?new_admin=${new_admin}`;
+//     const res = await fetch(url, {
+//         method: "POST",
+//         headers: {
+//             "Content-Type": "application/json",
+//         }
+//     });
+//     const data = await res.json();
+//     console.log(data);
+//     return data;
+// }
 
 const setPause = async (paused: boolean) => {
     const url = `${API_BASE}/auth/set-pause?paused=${paused}`;
@@ -210,5 +210,5 @@ const page = async (page: number, limit: number) => {
 }
 
 export {
-    health, initAuth, setAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter
+    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter
 }

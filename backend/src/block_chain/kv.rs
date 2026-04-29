@@ -21,7 +21,7 @@ use tokio::sync::Mutex;
 use base64::{Engine, engine::general_purpose};
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use log::info;
+use log::{error, info};
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -429,7 +429,7 @@ pub async fn scan(
         limit,
         keys,
     };
-
+    info!("从bitcask取的数据: {:?}", k_v);
     // ==============================
     // 生成所有 ValueAccount PDA
     // 传给合约做范围查询
@@ -438,7 +438,16 @@ pub async fn scan(
     for (key, pda) in k_v {
         info!("key: {:?}", key);
         // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
-        let value_pda = Pubkey::try_from(pda).unwrap();
+        let value_pda = match Pubkey::try_from(pda) {
+            Ok(v) => v,
+            Err(e) => {
+                error!("从节点查询出错: {:?}", e);
+                // 将 Vec<u8> 转换为字符串，方便查看
+                let msg = String::from_utf8_lossy(&e).to_string();
+                // 包装进你的错误枚举中返回[cite: 1]
+                return Err(Error::InternalError(msg));
+            }
+        };
         remaining_accounts.push(AccountMeta::new_readonly(value_pda, false));
     }
 
@@ -600,16 +609,28 @@ pub async fn page(
     // 把 key 列表通过指令数据传给合约
     let keys: Vec<Vec<u8>> = page_data.iter().map(|(k, _)| k.clone()).collect();
     let args = instruction::Page { keys };
-
+    info!("从bitcask取的数据: {:?}", page_data);
     // ==============================
     // 生成所有 ValueAccount PDA
     // 传给合约做范围查询
     // ==============================
     let mut remaining_accounts = Vec::new();
     for (key, pda) in page_data {
-        info!("key: {:?}", key);
+        info!("Key: {}, PDA Raw Data (Hex): {}", 
+            String::from_utf8_lossy(&key), 
+            hex::encode(&pda)
+        );
         // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
-        let value_pda = Pubkey::try_from(pda).unwrap();
+        let value_pda = match Pubkey::try_from(pda) {
+            Ok(v) => v,
+            Err(e) => {
+                error!("从节点查询出错: {:?}", e);
+                // 将 Vec<u8> 转换为字符串，方便查看
+                let msg = String::from_utf8_lossy(&e).to_string();
+                // 包装进你的错误枚举中返回[cite: 1]
+                return Err(Error::InternalError(msg));
+            }
+        };
         remaining_accounts.push(AccountMeta::new_readonly(value_pda, false));
     }
 

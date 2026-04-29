@@ -29,7 +29,7 @@ use std::path::PathBuf;
 use std::sync::{Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex};
 
 use openraft::{Config as RaftConfig, Raft};
 use crate::raft::network::Network;
@@ -152,7 +152,7 @@ async fn main() -> Result<()> {
         .route("/kv/get", get(api::gets))
         .route("/kv/scan", post(api::scan))
         .route("/kv/page", post(api::page))
-        
+
         // 权限接口
         .route("/auth/init-admin", post(api::init_auth))
         .route("/auth/set-pause", post(api::raft_pause))

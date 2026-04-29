@@ -1,4 +1,8 @@
 ```shell
+cargo run -- 1 8001
+cargo run -- 1 8002
+cargo run -- 1 8003
+
 curl -X POST http://127.0.0.1:8001/raft/init -H "Content-Type: application/json" -d '{
     "1": { "addr": "127.0.0.1:8001" },
     "2": { "addr": "127.0.0.1:8002" },

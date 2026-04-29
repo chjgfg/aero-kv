@@ -1,3 +1,4 @@
+use log::info;
 use openraft::storage::{RaftSnapshotBuilder, RaftStateMachine, Snapshot};
 use openraft::{LogId, SnapshotMeta, StoredMembership};
 use rs_merkle::MerkleTree;
@@ -5,6 +6,7 @@ use rs_merkle::algorithms::Sha256;
 use std::io::Cursor;
 use std::sync::Arc;
 
+use crate::constants::{SYS_BASE_FEE, SYS_PAUSED};
 use crate::raft::to_storage_error;
 use crate::raft::types::{KvOp, RaftConfig, SnapshotData};
 use crate::storage::engine::DiskClient;
@@ -78,21 +80,25 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
                 match op {
                     KvOp::Upsert { key, value: _, pda } => {
                         // 关键修复：存入 pda 而不是 value
+                        info!("raft upsert key: {}", key);
                         let _ = db.set(key.into_bytes(), pda); 
                         need_rebuild_tree = true;
                     },
                     KvOp::Delete { key } => {
+                        info!("raft delete key: {}", key);
                         let _ = db.delete(key.into_bytes());
                         need_rebuild_tree = true; // 只要有写入，就标记需要重建
                     }
                     // --- 处理新变体，将其持久化到本地存储 ---[cite: 1]
                     KvOp::SetPause { paused } => {
-                        let _ = db.set(b"sys_paused".to_vec(), vec![paused as u8]);
+                        info!("raft paused key: {:?}", SYS_PAUSED);
+                        let _ = db.set(SYS_PAUSED.to_vec(), vec![paused as u8]);
                     }
                     KvOp::SetFee { base_fee, .. } => {
+                        info!("raft fee key: {:?}", SYS_BASE_FEE);
                         // 这里可以根据需要存储完整的手续费结构体
                         let val = serde_json::to_vec(&base_fee).unwrap();
-                        let _ = db.set(b"sys_base_fee".to_vec(), val);
+                        let _ = db.set(SYS_BASE_FEE.to_vec(), val);
                     }
                 }
             }

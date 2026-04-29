@@ -9,7 +9,7 @@ use crate::{
         client::ChainClient,
         types::{KVEvent, ValueAccount},
     },
-    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, VALUE_SEEDS},
+    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, SYS_BASE_FEE, SYS_PAUSED, VALUE_SEEDS},
     error::{Error, Result},
     storage::engine::DiskClient,
     utils::bytes_to_str,
@@ -21,7 +21,7 @@ use tokio::sync::Mutex;
 use base64::{Engine, engine::general_purpose};
 use contract::accounts; // 👈 用你的合约名
 use contract::instruction;
-use log::{error, info};
+use log::{error, info, warn};
 use solana_client::rpc_config::RpcTransactionConfig;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
@@ -436,6 +436,18 @@ pub async fn scan(
     // ==============================
     let mut remaining_accounts = Vec::new();
     for (key, pda) in k_v {
+        // 过滤掉所有以 "sys_" 开头的内部配置键
+        // --- 关键过滤逻辑：跳过系统配置项 ---
+        if key == SYS_PAUSED || key == SYS_BASE_FEE {
+            info!("跳过系统配置项: {:?}", key);
+            continue;
+        }
+
+        // 也可以采用更健壮的长度判断：PDA 必须是 32 字节
+        if pda.len() != 32 {
+            warn!("跳过长度非 32 字节的数据 (Key: {:?})", key);
+            continue;
+        }
         info!("key: {:?}", key);
         // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
         let value_pda = match Pubkey::try_from(pda) {
@@ -616,6 +628,18 @@ pub async fn page(
     // ==============================
     let mut remaining_accounts = Vec::new();
     for (key, pda) in page_data {
+        // 过滤掉所有以 "sys_" 开头的内部配置键
+        // --- 关键过滤逻辑：跳过系统配置项 ---
+        if key == SYS_PAUSED || key == SYS_BASE_FEE {
+            info!("跳过系统配置项: {:?}", key);
+            continue;
+        }
+
+        // 也可以采用更健壮的长度判断：PDA 必须是 32 字节
+        if pda.len() != 32 {
+            warn!("跳过长度非 32 字节的数据 (Key: {:?})", key);
+            continue;
+        }
         info!("Key: {}, PDA Raw Data (Hex): {}", 
             String::from_utf8_lossy(&key), 
             hex::encode(&pda)

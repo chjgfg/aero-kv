@@ -62,3 +62,6 @@ docs
 test-ledger
 
 /sh
+
+/proxy/target
+/proxy/Cargo.lock

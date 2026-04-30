@@ -1,8 +1,14 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic"; // 引入动态加载工具
+
+// 1. 动态导入 WalletMultiButton，并关闭服务端渲染
+const WalletMultiButtonDynamic = dynamic(
+    async () => (await import("@solana/wallet-adapter-react-ui")).WalletMultiButton,
+    { ssr: false }
+);
 
 export default function LoginPage() {
     const { connected, publicKey, disconnect } = useWallet();
@@ -19,7 +25,8 @@ export default function LoginPage() {
                 </p>
 
                 <div className="flex justify-center mb-6">
-                    <WalletMultiButton />
+                    {/* 2. 使用动态加载的按钮组件 */}
+                    <WalletMultiButtonDynamic />
                 </div>
 
                 {connected && publicKey && (
@@ -32,8 +39,7 @@ export default function LoginPage() {
                         </div>
 
                         <button
-                            // onClick={() => router.push("/dashboard")}
-                            onClick={() => router.push("/test")}
+                            onClick={() => router.push("/dashboard")}
                             className="w-full bg-green-500 hover:bg-green-600 text-white py-4 rounded-xl font-semibold transition"
                         >
                             进入管理后台

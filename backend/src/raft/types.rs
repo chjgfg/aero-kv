@@ -27,6 +27,7 @@ pub enum KvOp {
 }
 
 // 写操作的响应（可选）
+#[allow(dead_code)]
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KvResponse {
     pub value: Option<String>,

@@ -108,9 +108,9 @@ const moke = async () => {
 
     data.forEach(async (item: any) => {
         try {
-            console.log('开始');
-            console.log(item.key);
-            console.log(item.value);
+            // console.log('开始');
+            // console.log(item.key);
+            // console.log(item.value);
             await upsert(item.key, item.value);
             await sleep(5000);  // 等待 2s
             console.log('5000ms 后执行');

@@ -1,0 +1,13 @@
+
+> frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.40.131:3000
+- Environments: .env
+✓ Ready in 341ms
+
+(node:79219) Warning: `--localstorage-file` was provided without a valid path
+(Use `node --trace-warnings ...` to show where the warning was created)
+ GET / 200 in 646ms (next.js: 304ms, application-code: 341ms)

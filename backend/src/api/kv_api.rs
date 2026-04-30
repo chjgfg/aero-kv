@@ -84,6 +84,7 @@ pub async fn init_counter(State(state): State<Arc<AppState>>) -> impl IntoRespon
     }
 }
 
+#[allow(dead_code)]
 pub async fn upsert(
     State(state): State<Arc<AppState>>,
     Json(req): Json<KVRequest>,
@@ -109,6 +110,7 @@ pub async fn upsert(
     (StatusCode::OK, Json(json_response)).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Query(req): Query<KVQuery>,

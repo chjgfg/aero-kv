@@ -12,6 +12,7 @@ use std::{str::FromStr, sync::Arc};
 use crate::{AppState, auth, error::Error};
 
 #[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
 pub struct AuthQuery {
     pub new_admin: Option<String>,
     pub paused: Option<bool>,
@@ -35,6 +36,7 @@ pub async fn init_auth(State(state): State<Arc<AppState>>) -> impl IntoResponse 
     (StatusCode::OK, Json(json_response)).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn set_admin(
     State(state): State<Arc<AppState>>,
     Query(req): Query<AuthQuery>,
@@ -59,6 +61,7 @@ pub async fn set_admin(
     (StatusCode::OK, res.to_string()).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn set_pause(
     State(state): State<Arc<AppState>>,
     Query(req): Query<AuthQuery>,

@@ -25,7 +25,7 @@ impl RaftNetworkFactory<RaftConfig> for Network {
     // 注意：这里没有 #[async_trait] 宏，直接写 async fn
     async fn new_client(&mut self, target: NodeId, node: &BasicNode) -> Self::Network {
         NetworkConnection {
-            target,
+            _target: target,
             addr: node.addr.clone(),
             client: Client::new(),
         }
@@ -33,7 +33,7 @@ impl RaftNetworkFactory<RaftConfig> for Network {
 }
 
 pub struct NetworkConnection {
-    target: NodeId,
+    _target: NodeId,
     addr: String,
     client: Client,
 }

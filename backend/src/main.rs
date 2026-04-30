@@ -10,8 +10,6 @@ mod fee;
 mod utils;
 mod raft;
 
-use crate::api::raft_api::{raft_append, raft_snapshot, raft_vote};
-use crate::api::raft_init;
 use crate::block_chain::client::ChainClient;
 use crate::config::log_config::log_config;
 use crate::storage::engine::DiskClient;
@@ -35,7 +33,7 @@ use openraft::{Config as RaftConfig, Raft};
 use crate::raft::network::Network;
 use crate::raft::log_storage::MyLogStorage;
 use crate::raft::state_machine::MyStateMachine;
-use crate::raft::types::{RaftConfig as MyRaftConfig, NodeId};
+use crate::raft::types::{RaftConfig as MyRaftConfig};
 
 // 给 ChainClient 加 Arc 包装，满足 Clone 约束（Axum State 要求 Clone）
 // 1. 给两个状态都包上 Arc（满足 Clone + Send + Sync + 'static）
@@ -133,10 +131,10 @@ async fn main() -> Result<()> {
     // 4. 注册路由（Axum 0.8.x 标准写法）
     let app = Router::new()
         // --- Raft 内部 RPC 路由 (必须添加) ---[cite: 1]
-        .route("/raft/init", post(raft_init))
-        .route("/raft/append", post(raft_append))
-        .route("/raft/vote", post(raft_vote))
-        .route("/raft/snapshot", post(raft_snapshot))
+        .route("/raft/init", post(api::raft_init))
+        .route("/raft/append", post(api::raft_append))
+        .route("/raft/vote", post(api::raft_vote))
+        .route("/raft/snapshot", post(api::raft_snapshot))
         
         .route("/health", get(api::health))
         // KV 接口

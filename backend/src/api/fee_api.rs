@@ -31,6 +31,7 @@ pub async fn init_fee(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     (StatusCode::OK, Json(json_response)).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn set_fee(
     State(state): State<Arc<AppState>>,
     Json(req): Json<FeeRequest>,

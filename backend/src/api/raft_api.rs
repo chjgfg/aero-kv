@@ -236,7 +236,7 @@ pub async fn raft_fee(
 
 
 
-
+#[allow(dead_code)]
 pub async fn raft_gets(
     State(state): State<Arc<AppState>>,
     Query(req): Query<KVQuery>,
@@ -304,6 +304,7 @@ pub async fn raft_gets(
     (StatusCode::OK, Json(json_response)).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn raft_scan(
     State(state): State<Arc<AppState>>,
     Json(req): Json<KVRequest>,
@@ -371,6 +372,7 @@ pub async fn raft_scan(
     (StatusCode::OK, Json(json_response)).into_response()
 }
 
+#[allow(dead_code)]
 pub async fn raft_page(
     State(state): State<Arc<AppState>>,
     Json(req): Json<PageRequest>,

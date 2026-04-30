@@ -1,4 +1,11 @@
 ```shell
+sysctl -w kernel.io_uring_disabled=0
+solana-test-validator -r
+
+anchor deploy
+```
+
+```shell
 cargo run -- 1 8001
 cargo run -- 2 8002
 cargo run -- 3 8003

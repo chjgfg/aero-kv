@@ -92,6 +92,21 @@ async function verifySingleProof(data: any): Promise<boolean> {
     }
 }
 
+// 统一封装存入缓存的函数
+const saveProofData = (pairs: any[], hashes: string[], indices: number[], proof: string[], root: string) => {
+    const dataToSave = {
+        leaves: pairs.map((p, i) => ({
+            key: p.key,
+            value: p.value,
+            hash: hashes[i],
+            index: indices[i]
+        })),
+        proof: proof,
+        merkle_root: root
+    };
+    localStorage.setItem("lastProof", JSON.stringify(dataToSave));
+};
+
 export {
-    verifyBatchProof, verifySingleProof
+    verifyBatchProof, verifySingleProof, saveProofData
 }

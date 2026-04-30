@@ -1,4 +1,5 @@
 import { verifyBatchProof, verifySingleProof } from "./merkle";
+import Swal from 'sweetalert2';
 
 // 🔥 从 .env 环境变量读取（最标准企业级方案）
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
@@ -197,8 +198,16 @@ const page = async (page: number, limit: number) => {
         }),
     });
 
-    if (!res.ok) {
-        throw new Error(`请求失败: ${res.status}`);
+    console.log(res);
+    if (res.status !== 200) {
+        // throw new Error(`请求失败: ${res.status}`);
+        Swal.fire({
+            title: '请求错误',
+            text: `请先一键初始化`,
+            icon: 'error',
+            confirmButtonText: '知道了'
+        });
+        return;
     }
 
     const data = await res.json();

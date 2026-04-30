@@ -63,3 +63,6 @@ test-ledger
 
 /proxy/target
 /proxy/Cargo.lock
+
+*/*.log
+/sh/.validator.pid

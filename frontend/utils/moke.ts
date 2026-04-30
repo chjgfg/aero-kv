@@ -1,4 +1,5 @@
 import { upsert } from "./http";
+import Swal from 'sweetalert2';
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -106,18 +107,26 @@ const moke = async () => {
         },
     ];
 
-    data.forEach(async (item: any) => {
+    // 💡 使用 for...of 才能真正让 await 按顺序执行
+    for (const item of data) {
         try {
-            // console.log('开始');
-            // console.log(item.key);
-            // console.log(item.value);
+            console.log(item);
             await upsert(item.key, item.value);
-            await sleep(5000);  // 等待 2s
-            console.log('5000ms 后执行');
+            // 注意：你注释写等待 2s，但代码是 2000 ms
+            await sleep(2000);
+            console.log('2000 ms 后执行');
         } catch (e) {
-            console.log(e)
+            // 🛑 第一次报错就在这里捕获
+            // console.error("遇到错误，停止后续操作:", e);
+            Swal.fire({
+                title: '写入出错',
+                text: `在处理 ${item.key} 时发生错误`,
+                icon: 'error',
+                confirmButtonText: '知道了'
+            });
+            break;
         }
-    });
+    }
 }
 
 

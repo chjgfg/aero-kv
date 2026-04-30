@@ -15,8 +15,9 @@ import {
     page,
     initCounter,
 } from "@/utils/http";
-import { verifySingleProof } from "@/utils/merkle";
+import { saveProofData, verifySingleProof } from "@/utils/merkle";
 import { moke } from "@/utils/moke";
+import { useRouter } from "next/navigation"; // 1. 确保导入了 useRouter
 
 type TableItem = {
     key: string;
@@ -24,6 +25,7 @@ type TableItem = {
 };
 
 export default function KVAdminPage() {
+    const router = useRouter(); // 2. 在组件内部初始化
     // 系统初始化
     const [initResult, setInitResult] = useState("");
     const [loadingInit, setLoadingInit] = useState(false);
@@ -132,6 +134,7 @@ export default function KVAdminPage() {
 
             if (res?.key && res?.value) {
                 setTableList([{ key: res.key, value: res.value }]);
+                saveProofData([res], [res.key_hash], [res.leaf_index], res.proof, res.merkle_root);
                 // 标记为单点查询模式，隐藏分页
                 setIsSingleMode(true);
                 setIsScanMode(false);
@@ -150,6 +153,7 @@ export default function KVAdminPage() {
             setResJson(res);
 
             if (Array.isArray(res?.pairs)) {
+                saveProofData(res.pairs, res.key_hashes, res.leaf_indices, res.proof, res.merkle_root);
                 // 2. 保存全部数据，用于前端假分页
                 setScanAllData(res.pairs);
                 setScanPageNum(1);
@@ -181,6 +185,7 @@ export default function KVAdminPage() {
     const fetchPageData = async () => {
         try {
             const res = await page(pageNum, pageSize);
+            console.log(res);
             setResJson(res);
 
             const totalItems = res.total || 0;
@@ -188,6 +193,7 @@ export default function KVAdminPage() {
             setTotalPages(Math.ceil(totalItems / pageSize));
 
             if (Array.isArray(res?.pairs)) {
+                saveProofData(res.pairs, res.key_hashes, res.leaf_indices, res.proof, res.merkle_root);
                 setTableList(res.pairs);
             } else {
                 setTableList([]);
@@ -354,7 +360,7 @@ export default function KVAdminPage() {
         <div className="min-h-screen bg-slate-900 text-slate-100 p-6">
             <div className="max-w-6xl mx-auto space-y-6">
                 <h1 className="text-3xl font-bold text-center text-sky-400">
-                    KV 存储 + Merkle 防篡改管理平台
+                    AeroKV 存储
                 </h1>
 
                 {/* 顶部控制区 */}
@@ -385,7 +391,7 @@ export default function KVAdminPage() {
                                 </button>
                             </div>
                             {ctrlMsg && <p className="text-sm text-amber-300">{ctrlMsg}</p>}
-                            <pre className="p-3 bg-slate-950 rounded text-emerald-400 text-sm h-24 overflow-auto">
+                            <pre className="p-3 bg-slate-950 rounded text-emerald-400 text-sm h-31 overflow-auto">
                                 {initResult || "等待初始化操作..."}
                             </pre>
                         </div>
@@ -432,7 +438,7 @@ export default function KVAdminPage() {
                             <div className="flex gap-3">
                                 <button
                                     onClick={mokeTest}
-                                    className="px-6 py-2 bg-rose-600 rounded-lg hover:bg-rose-500 transition font-medium"
+                                    className="w-full py-2 bg-rose-600 rounded-lg hover:bg-rose-500 transition font-medium"
                                 >
                                     自动添加数据测试
                                 </button>
@@ -497,17 +503,28 @@ export default function KVAdminPage() {
                         <h2 className="text-xl font-semibold text-slate-200">
                             {isScanMode ? "📊 扫描结果列表" : "📊 数据列表"}
                         </h2>
-                        <button
-                            onClick={() => {
-                                setIsScanMode(false);
-                                setIsSingleMode(false);
-                                setPageNum(1);
-                                fetchPageData();
-                            }}
-                            className="px-4 py-2 bg-orange-600 rounded-lg hover:bg-orange-500 transition text-sm font-medium"
-                        >
-                            刷新全表
-                        </button>
+                        {/* 🌟 关键：用一个 div 把两个按钮包起来，并设置 flex 和 gap */}
+                        <div className="flex gap-3"> 
+                            <button
+                                onClick={() => {
+                                    router.push("/visual");
+                                }}
+                                className="px-4 py-2 bg-orange-600 rounded-lg hover:bg-orange-500 transition text-sm font-medium"
+                            >
+                                Merkle 可视化
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsScanMode(false);
+                                    setIsSingleMode(false);
+                                    setPageNum(1);
+                                    fetchPageData();
+                                }}
+                                className="px-4 py-2 bg-orange-600 rounded-lg hover:bg-orange-500 transition text-sm font-medium"
+                            >
+                                刷新全表
+                            </button>
+                        </div>
                     </div>
                     <div className="overflow-auto rounded-lg border border-slate-700">
                         <table className="w-full text-sm">
@@ -515,6 +532,7 @@ export default function KVAdminPage() {
                                 <tr>
                                     <th className="px-4 py-3 text-left w-1/3 font-semibold">Key</th>
                                     <th className="px-4 py-3 text-left font-semibold">Value</th>
+                                    <th className="px-4 py-3 text-left font-semibold">Merkle</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -523,6 +541,21 @@ export default function KVAdminPage() {
                                         <tr key={idx} className="border-t border-slate-700 hover:bg-slate-700/50 transition-colors">
                                             <td className="px-4 py-3 font-mono">{item.key}</td>
                                             <td className="px-4 py-3 font-mono">{item.value}</td>
+                                            <td className="px-4 py-3">
+                                                <button 
+                                                    onClick={() => {
+                                                        // 从当前页面的 resJson 中提取对应的证据数据
+                                                        // 注意：page/scan 接口返回的数据在 resJson 里，我们需要根据 idx 取出对应的 hash
+                                                        const singleItemHash = resJson.key_hashes[idx];
+                                                        const singleItemIndex = resJson.leaf_indices[idx];
+                                                        saveProofData([item], [singleItemHash], [singleItemIndex], resJson.proof, resJson.merkle_root);
+                                                        router.push("/visual");
+                                                    }}
+                                                    className="text-sky-400 text-xs hover:underline"
+                                                >
+                                                    验证此条
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))
                                 ) : (
@@ -541,7 +574,7 @@ export default function KVAdminPage() {
                 </div>
 
                 {/* 原始 JSON 结果（醒目位置） */}
-                <div className="bg-slate-800 rounded-xl p-6 shadow-lg">
+                {/* <div className="bg-slate-800 rounded-xl p-6 shadow-lg">
                     <h2 className="text-xl font-semibold mb-4 text-slate-300">📤 接口返回数据</h2>
                     <pre className="p-4 bg-slate-950 rounded text-slate-300 text-sm max-h-72 overflow-auto">
                         {resJson ? JSON.stringify(resJson, null, 2) : "暂无返回数据"}
@@ -552,7 +585,7 @@ export default function KVAdminPage() {
                     <Link href="/visual" className="text-sky-400 hover:underline">
                         前往 Merkle 树可视化页面 →
                     </Link>
-                </div>
+                </div> */}
             </div>
         </div>
     );

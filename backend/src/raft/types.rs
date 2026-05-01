@@ -29,7 +29,10 @@ pub enum KvOp {
     SyncLogin {
         pubkey: String,
         permissions: Vec<Action>,
-    }, // 同步登录状态
+    },  
+    SyncLogout {
+        pubkey: String,
+    }, // 同步登出状态
     SyncGrant {
         user_pubkey: String,
         permissions: Vec<Action>,

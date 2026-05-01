@@ -88,7 +88,7 @@ pub fn split_char(str: &str) -> Result<Vec<Action>> {
 }
 
 // 在线用户会话（内存）
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSession {
     pub is_logged_in: bool,
     pub permissions: Vec<Action>, // 登录时从 DiskClient 加载

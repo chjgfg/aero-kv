@@ -3,21 +3,50 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
-    extract::{Query, State},
-    http::StatusCode,
-    response::IntoResponse,
+    Extension, Json, body::Body, extract::{Query, State}, http::{Request, StatusCode}, middleware::Next, response::{IntoResponse, Response}
 };
 use log::info;
 use openraft::BasicNode;
 
 use crate::{
-    AppState, api::{
-        auth_api::AuthQuery,
+    AppState,
+    api::{
+        auth_api::{AuthQuery, AuthRequest},
         fee_api::FeeRequest,
         kv_api::{KVQuery, KVRequest},
-    }, auth, block_chain, constants::VALUE_SEEDS, fee, raft::types::{KvOp, NodeId, RaftConfig}, utils::{self}
+    },
+    auth::{self, types::Action}, block_chain,
+    constants::VALUE_SEEDS,
+    fee,
+    raft::types::{KvOp, NodeId, RaftConfig},
+    utils::{self},
 };
+
+pub async fn auth_middleware(
+    // 🌟 建议直接去掉泛型 <B>，简单直接
+    State(_state): State<Arc<AppState>>,
+    mut req: Request<Body>, // 🌟 改为具体的 Body 类型
+    next: Next,
+) -> Response {
+    // 1. 提取公钥
+    let pubkey_res = req
+        .headers()
+        .get("x-user-pubkey")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string()); // 🌟 关键：在这里直接转成 String，断开借用
+
+    let pubkey: String = match pubkey_res {
+        // 🌟 现在它是 String 类型
+        Some(k) => k,
+        None => return (StatusCode::UNAUTHORIZED, "User not logged in").into_response(),
+    };
+
+    // 2. 存入扩展（这一步你写对了，非常棒，方便后续 Handler 直接用 Extension 取）
+    req.extensions_mut().insert(pubkey.to_string());
+
+    // 3. 继续执行后续逻辑
+    next.run(req).await
+}
 
 pub async fn raft_append(
     State(state): State<Arc<AppState>>,
@@ -55,8 +84,15 @@ pub async fn raft_init(
 
 pub async fn raft_upsert(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>, // 🌟 直接拿到中间件塞进去的公钥
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
+    // 如果你想在 Handler 里再次手动校验（虽然中间件可能已经做过了）
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::RaftUpsert) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("upsert key: {}, value: {}", req.key, req.value);
     let chain = state.chain.clone();
     let k = req.key.clone().into_bytes();
@@ -112,10 +148,16 @@ pub async fn raft_upsert(
 
 pub async fn raft_delete(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
+    // 如果你想在 Handler 里再次手动校验（虽然中间件可能已经做过了）
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::RaftDelete) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("delete key: {}", req.key);
-
     // 1. 构造 Raft 删除提案[cite: 1]
     let op = KvOp::Delete {
         key: req.key.clone(),
@@ -159,14 +201,19 @@ pub async fn raft_delete(
 
 pub async fn raft_pause(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Query(req): Query<AuthQuery>,
 ) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::RaftPause) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     let Ok(paused) = req.paused.ok_or_else(|| "missing paused param".to_string()) else {
         return (StatusCode::BAD_REQUEST, "set pause error").into_response();
     };
 
     info!("raft set pause paused: {}", paused);
-
     // 1. 提交 Raft 提案
     let op = KvOp::SetPause { paused };
     match state.raft.client_write(op).await {
@@ -196,10 +243,15 @@ pub async fn raft_pause(
 
 pub async fn raft_fee(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Json(req): Json<FeeRequest>,
 ) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::RaftFee) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("raft set fee base_fee: {}", req.base_fee);
-
     // 1. 提交 Raft 提案
     let op = KvOp::SetFee {
         base_fee: req.base_fee,
@@ -231,9 +283,6 @@ pub async fn raft_fee(
             .into_response(),
     }
 }
-
-
-
 
 /* #[allow(dead_code)]
 pub async fn raft_gets(
@@ -443,3 +492,123 @@ pub async fn raft_page(
     (StatusCode::OK, Json(json_response)).into_response()
 }
  */
+
+pub async fn raft_login(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthRequest>,
+) -> impl IntoResponse {
+    info!("login");
+    let auth_storage = state.session.auth_storage.clone();
+    let Some(user_pubkey) = req.user_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain login error").into_response();
+    };
+    let pubkey = user_pubkey.as_str();
+    info!("pubkey: {}", user_pubkey);
+    let Ok(res) = state.session.login(pubkey, auth_storage).await else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "raft login error").into_response();
+    };
+
+    let op = KvOp::SyncLogin {
+        pubkey: user_pubkey,
+        permissions: res.clone().permissions,
+    };
+
+    match state.raft.client_write(op).await {
+        Ok(_) => {
+            info!("login write raft ok");
+            // 登录成功，返回用户信息
+            Json(res).into_response()
+        }
+        Err(e) => {
+            // 🌟 错误响应也可以直接返回 Result 的 Err 分支
+            // 或者手动构造一个 Response
+            let error_response = (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("Raft Consensus Error: {:?}", e),
+            );
+            error_response.into_response()
+        }
+    }
+}
+
+pub async fn raft_logout(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthRequest>,
+) -> impl IntoResponse {
+    let Some(user_pubkey) = req.user_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    let pubkey = user_pubkey.as_str();
+    let Ok(res) = state.session.logout(pubkey).await else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+
+    let op = KvOp::SyncLogout {
+        pubkey: user_pubkey,
+    };
+
+    match state.raft.client_write(op).await {
+        Ok(_) => {
+            // 登录成功，返回用户信息
+            Json(res).into_response()
+        }
+        Err(e) => {
+            // 🌟 错误响应也可以直接返回 Result 的 Err 分支
+            // 或者手动构造一个 Response
+            let error_response = (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("Raft Consensus Error: {:?}", e),
+            );
+            error_response.into_response()
+        }
+    }
+}
+
+pub async fn raft_grant(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthRequest>,
+) -> impl IntoResponse {
+    let auth_storage = state.session.auth_storage.clone();
+    let Some(admin_pubkey) = req.admin_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    let Some(user_pubkey) = req.user_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    let Some(perm_char) = req.perm_char else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    info!("admin_pubkey: {}, user_pubkey: {}, perm_char: {:?}", admin_pubkey, user_pubkey, perm_char);
+    let Ok(res) = state.session.grant_permission(
+        admin_pubkey.as_str(),
+        &user_pubkey,
+        perm_char,
+        auth_storage.clone(),
+    )
+    .await
+    else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    
+    let op = KvOp::SyncGrant {
+        user_pubkey,
+        permissions: res.clone(),
+    };
+    
+    match state.raft.client_write(op).await {
+        Ok(_) => {
+            info!("grant write raft ok");
+            // 登录成功，返回用户信息
+            Json(res).into_response()
+        }
+        Err(e) => {
+            // 🌟 错误响应也可以直接返回 Result 的 Err 分支
+            // 或者手动构造一个 Response
+            let error_response = (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("Raft Consensus Error: {:?}", e),
+            );
+            error_response.into_response()
+        }
+    }
+}

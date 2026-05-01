@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 // # upsert / get / scan 接口
 use axum::{
-    Json,
+    Extension, Json,
     extract::{Query, State},
     http::StatusCode,
     response::IntoResponse,
@@ -13,6 +13,7 @@ use serde_json::json;
 
 use crate::{
     AppState,
+    auth::types::Action,
     block_chain::{self},
     utils,
 };
@@ -36,7 +37,15 @@ pub struct KVQuery {
 }
 
 // 示例 KV 接口（你可以替换成自己的业务逻辑）
-pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn init_storage(
+    State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
+) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::InitStorage) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("init storage");
     let chain = state.chain.clone();
     let Ok(res) = block_chain::init_storage(chain).await else {
@@ -56,7 +65,15 @@ pub async fn init_storage(State(state): State<Arc<AppState>>) -> impl IntoRespon
 }
 
 // 新增一个接口，专门用来初始化计数器
-pub async fn init_counter(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn init_counter(
+    State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
+) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::InitCounter) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("init counter");
     let chain = state.chain.clone();
 
@@ -137,8 +154,14 @@ pub async fn delete(
 
 pub async fn gets(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Query(req): Query<KVQuery>,
 ) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::Get) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("get key: {}", req.key);
     let chain = state.chain.clone();
     let k = req.key.clone().into_bytes();
@@ -200,8 +223,14 @@ pub async fn gets(
 
 pub async fn scan(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Json(req): Json<KVRequest>,
 ) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::Scan) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("scan key: {}, limit: {}", req.key, req.limit);
     let chain = state.chain.clone();
     let storage = state.storage.clone();
@@ -264,8 +293,14 @@ pub async fn scan(
 
 pub async fn page(
     State(state): State<Arc<AppState>>,
+    Extension(pubkey): Extension<String>,
     Json(req): Json<PageRequest>,
 ) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::Page) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("page offset: {}, limit: {}", req.page, req.limit);
     let chain = state.chain.clone();
     let storage = state.storage.clone();

@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use axum::{Json, http::StatusCode};
 use rs_merkle::{Hasher, MerkleTree, algorithms::Sha256};
 use tokio::sync::Mutex;
 
@@ -47,7 +46,6 @@ pub async fn calc_merkle_root(state: Arc<AppState>) -> Result<[u8; 32]> {
     Ok(root)
 }
 
-// utils.rs
 pub async fn rebuild_merkle_tree(
     disk: &Arc<Mutex<DiskClient>>,
     merkle_tree_lock: &Arc<Mutex<MerkleTree<Sha256>>>,
@@ -73,17 +71,17 @@ pub async fn rebuild_merkle_tree(
     Ok(root)
 }
 
-pub async fn ensure_leader_and_fresh(
-    state: &Arc<AppState>,
-) -> std::result::Result<(), (StatusCode, Json<serde_json::Value>)> {
-    // 方案二：通过 Raft 心跳确认自己仍是有效 Leader 且数据已同步
-    if let Err(e) = state.raft.ensure_linearizable().await {
-        let json_response = serde_json::json!({
-            "status": "error",
-            "message": "Consistent read failed (Node may not be Leader)",
-            "detail": e.to_string()
-        });
-        return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json_response)));
-    }
-    Ok(())
-}
+// pub async fn ensure_leader_and_fresh(
+//     state: &Arc<AppState>,
+// ) -> std::result::Result<(), (StatusCode, Json<serde_json::Value>)> {
+//     // 方案二：通过 Raft 心跳确认自己仍是有效 Leader 且数据已同步
+//     if let Err(e) = state.raft.ensure_linearizable().await {
+//         let json_response = serde_json::json!({
+//             "status": "error",
+//             "message": "Consistent read failed (Node may not be Leader)",
+//             "detail": e.to_string()
+//         });
+//         return Err((StatusCode::SERVICE_UNAVAILABLE, Json(json_response)));
+//     }
+//     Ok(())
+// }

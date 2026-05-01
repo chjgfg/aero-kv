@@ -17,6 +17,7 @@ use crate::storage::engine::DiskClient;
 use crate::error::Result;
 use crate::{config::env_config::Config, error::Error};
 use axum::extract::FromRef;
+use axum::middleware;
 use axum::{
     Router,
     routing::{delete, get, post},
@@ -87,10 +88,10 @@ async fn main() -> Result<()> {
     let merkle_tree = Arc::new(tokio::sync::Mutex::new(MerkleTree::new()));
     let leaf_hashes = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
-    let mut session_manager = SessionManager::new(config); // 创建一次
+    let mut session_manager = SessionManager::new(config, auth.clone()); // 创建一次
     // 🌟 关键：在这里初始化权限
     // 从本地 auth.log 加载已有的用户权限到内存 DashMap
-    session_manager.init_auth(auth.clone()).await;
+    let _ = session_manager.init_auth().await;
 
     // 3. 初始化 Raft 存储层与网络层
     let log_store = MyLogStorage { db: raft };
@@ -139,24 +140,13 @@ async fn main() -> Result<()> {
         .expose_headers(Any)
         .allow_credentials(false);
 
-    // 4. 注册路由（Axum 0.8.x 标准写法）
-    let app = Router::new()
-        // --- Raft 内部 RPC 路由 (必须添加) ---[cite: 1]
-        .route("/raft/init", post(api::raft_init))
-        .route("/raft/append", post(api::raft_append))
-        .route("/raft/vote", post(api::raft_vote))
-        .route("/raft/snapshot", post(api::raft_snapshot))
-        
-        .route("/health", get(api::health))
+        // --- 第一组：受保护的接口 ---
+    let protected_routes = Router::new()
         // KV 接口
         .route("/kv/init-storage", post(api::init_storage))
         .route("/kv/init-counter", post(api::init_counter))
         .route("/kv/upsert", post(api::raft_upsert))
         .route("/kv/delete", delete(api::raft_delete))
-
-        // .route("/kv/get", get(api::raft_gets))
-        // .route("/kv/scan", post(api::raft_scan))
-        // .route("/kv/page", post(api::raft_page))
 
         .route("/kv/get", get(api::gets))
         .route("/kv/scan", post(api::scan))
@@ -165,9 +155,28 @@ async fn main() -> Result<()> {
         // 权限接口
         .route("/auth/init-admin", post(api::init_auth))
         .route("/auth/set-pause", post(api::raft_pause))
+
         // 手续费接口
         .route("/fee/init-fee", post(api::init_fee))
         .route("/fee/set-fee", post(api::raft_fee))
+
+        // 只给这一组路由加权限中间件 这个东西是在它上面写的接口都拦截
+        .route_layer(middleware::from_fn_with_state(state.clone(), api::auth_middleware));
+
+    // 4. 注册路由（Axum 0.8.x 标准写法）
+    let app = Router::new()
+        .merge(protected_routes) // 合并受保护的路由
+        // --- Raft 内部 RPC 路由 (必须添加) ---
+        .route("/raft/init", post(api::raft_init))
+        .route("/raft/append", post(api::raft_append))
+        .route("/raft/vote", post(api::raft_vote))
+        .route("/raft/snapshot", post(api::raft_snapshot))
+        
+        .route("/health", get(api::health))
+
+        .route("/auth/login", post(api::raft_login))
+        .route("/auth/logout", post(api::raft_logout))
+        .route("/auth/grant", post(api::raft_grant))
         // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
         .layer(cors)
         // 注入状态（Arc<ChainClient>）

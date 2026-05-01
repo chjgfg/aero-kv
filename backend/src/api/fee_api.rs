@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 // # set_fee 接口
-use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
+use axum::{Extension, Json, extract::State, http::StatusCode, response::IntoResponse};
 use log::info;
 
-use crate::{AppState, fee};
+use crate::{AppState, auth::types::Action, fee};
 
 #[derive(Debug, serde::Deserialize)]
 pub struct FeeRequest {
@@ -14,7 +14,12 @@ pub struct FeeRequest {
 }
 
 // 手续费接口示例
-pub async fn init_fee(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+pub async fn init_fee(State(state): State<Arc<AppState>>, Extension(pubkey): Extension<String>,) -> impl IntoResponse {
+    info!("pubkey: {}", pubkey);
+    let Ok(_) = state.session.check_permission(&pubkey, Action::InitFee) else {
+        // 🌟 在这里必须显式返回一个 Response
+        return (StatusCode::FORBIDDEN, "Permission denied").into_response();
+    };
     info!("init fee");
     let chain = state.chain.clone();
     let Ok(res) = fee::init_fee(chain).await else {

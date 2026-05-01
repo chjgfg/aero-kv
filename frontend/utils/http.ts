@@ -4,6 +4,11 @@ import Swal from 'sweetalert2';
 // 🔥 从 .env 环境变量读取（最标准企业级方案）
 const API_BASE = process.env.NEXT_PUBLIC_API_URL!;
 
+type Action =
+    | "InitAuth" | "InitStorage" | "InitCounter" | "InitFee"
+    | "RaftUpsert" | "RaftDelete" | "Get" | "Scan"
+    | "Page" | "RaftPause" | "RaftFee";
+
 const health = async () => {
     const res = await fetch(`${API_BASE}/health`);
     const data = await res.json();
@@ -12,10 +17,13 @@ const health = async () => {
 
 // --------------------------------------------------------------------------------------------------
 const initAuth = async () => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/auth/init-admin`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -37,11 +45,14 @@ const initAuth = async () => {
 // }
 
 const setPause = async (paused: boolean) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const url = `${API_BASE}/auth/set-pause?paused=${paused}`;
     const res = await fetch(url, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -50,25 +61,68 @@ const setPause = async (paused: boolean) => {
 }
 
 const login = async (pubkey: string) => {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // 将公钥字符串传给后端
         body: JSON.stringify({
-            pubkey: pubkey
+            user_pubkey: pubkey
         }),
     });
     const data = await res.json();
     console.log(data);
+    if (res.ok) {
+        // 🌟 登录成功，把公钥存起来
+        localStorage.setItem("my_pubkey", pubkey);
+    }
+    return data;
+}
+
+const logout = async () => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
+    const res = await fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 将公钥字符串传给后端
+        body: JSON.stringify({
+            user_pubkey: savedPubkey
+        }),
+    });
+    const data = await res.json();
+    console.log(data);
+    if (res.ok) {
+        // 🌟 登录成功，把公钥存起来
+        localStorage.removeItem("my_pubkey");
+    }
+    return data;
+}
+
+const grant = async (pubkey: string, selectedActions: Action[]) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
+    const res = await fetch(`${API_BASE}/auth/grant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 将公钥字符串传给后端
+        body: JSON.stringify({
+            admin_pubkey: savedPubkey,
+            user_pubkey: pubkey,
+            perm_char: selectedActions,
+        }),
+    });
+    const data = await res.json();
+    console.log("结果打印", data);
     return data;
 }
 
 // --------------------------------------------------------------------------------------------------
 const initFee = async () => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/fee/init-fee`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -77,10 +131,13 @@ const initFee = async () => {
 }
 
 const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item: number) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/fee/set-fee`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         },
         body: JSON.stringify({
             base_fee: base_fee,
@@ -100,10 +157,13 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
 
 // --------------------------------------------------------------------------------------------------
 const initStorage = async () => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/kv/init-storage`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -112,10 +172,13 @@ const initStorage = async () => {
 }
 
 const initCounter = async () => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/kv/init-counter`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -124,10 +187,13 @@ const initCounter = async () => {
 }
 
 const upsert = async (key: string, value: string) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/kv/upsert`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         },
         body: JSON.stringify({
             key: key,
@@ -146,11 +212,14 @@ const upsert = async (key: string, value: string) => {
 }
 
 const deleted = async (key: string) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const url = `${API_BASE}/kv/delete?key=${key}`;
     const res = await fetch(url, {
         method: "DELETE",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         }
     });
     const data = await res.json();
@@ -159,9 +228,17 @@ const deleted = async (key: string) => {
 }
 
 const gets = async (key: string) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     try {
         const url = `${API_BASE}/kv/get?key=${key}`;
-        const res = await fetch(url);
+        const res = await fetch(url, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                // 🌟 在这里塞进 Header
+                "x-user-pubkey": savedPubkey || ""
+            }
+        });
 
         if (!res.ok) {
             throw new Error(`HTTP 错误: ${res.status} ${res.statusText}`);
@@ -179,10 +256,13 @@ const gets = async (key: string) => {
 };
 
 const scan = async (key: string, limit: number) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/kv/scan`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         },
         body: JSON.stringify({
             key: key,
@@ -204,10 +284,13 @@ const scan = async (key: string, limit: number) => {
 }
 
 const page = async (page: number, limit: number) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
     const res = await fetch(`${API_BASE}/kv/page`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            // 🌟 在这里塞进 Header
+            "x-user-pubkey": savedPubkey || ""
         },
         body: JSON.stringify({
             page: page,
@@ -237,5 +320,5 @@ const page = async (page: number, limit: number) => {
 
 // --------------------------------------------------------------------------------------------------
 export {
-    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter, login
+    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter, login, logout, grant
 }

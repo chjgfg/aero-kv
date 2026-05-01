@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Shield, Save, CheckCircle2, Circle, UserPlus, Info } from 'lucide-react';
+import { grant } from '@/utils/http';
 
 // 1. 定义与后端完全一致的 Action 类型
 type Action =
@@ -51,7 +52,7 @@ export default function PermissionPage() {
             target: targetPubkey,
             permissions: selectedActions
         });
-
+        await grant(targetPubkey, selectedActions);
         setTimeout(() => {
             setIsSubmitting(false);
             alert(`成功为用户 ${targetPubkey.slice(0, 8)}... 提交权限变更提案！`);

@@ -7,7 +7,7 @@ use std::io::Cursor;
 use std::sync::Arc;
 
 use crate::auth::auth_config::SessionManager;
-use crate::auth::types::UserSession;
+use crate::auth::types::{UserSession, action_to_char};
 use crate::constants::{SYS_BASE_FEE, SYS_PAUSED};
 use crate::raft::to_storage_error;
 use crate::raft::types::{KvOp, RaftConfig, SnapshotData};
@@ -111,15 +111,20 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
                             permissions,
                         });
                     },
+                    KvOp::SyncLogout { pubkey } => {
+                        if let Some(mut session) = self.session_manager.sessions.get_mut(&pubkey) {
+                            session.is_logged_in = false; // 全集群内存同步失效
+                        }
+                    }
                     KvOp::SyncGrant { user_pubkey, permissions } => {
                         // 同步持久化到 auth_db 并在内存更新
-                        // let mut auth_db = self.auth_db.lock().await;
-                        // let val = permissions.iter().map(|a| action_to_char(*a).unwrap()).collect::<String>();
-                        // let _ = auth_db.set(user_pubkey.as_bytes().to_vec(), val.into_bytes());
+                        let mut auth_db = self.auth_db.lock().await;
+                        let val = permissions.iter().map(|a| action_to_char(*a).unwrap()).collect::<String>();
+                        let _ = auth_db.set(user_pubkey.as_bytes().to_vec(), val.into_bytes());
                         
-                        // if let Some(mut session) = self.session_manager.sessions.get_mut(&user_pubkey) {
-                        //     session.permissions = permissions;
-                        // }
+                        if let Some(mut session) = self.session_manager.sessions.get_mut(&user_pubkey) {
+                            session.permissions = permissions;
+                        }
                     }
                 }
             }

@@ -24,6 +24,10 @@ pub enum Error {
     InvalidPageError,
     InvalidParam(String),
     InternalError(String),
+    UnsupportedCharacter(String),
+    UserDoesNotExistError,
+    PermissionDoesNotExistError,
+    UserLogout,
 }
 
 impl Display for Error {
@@ -44,8 +48,12 @@ impl Display for Error {
             Error::ParseEmitError(msg) => write!(f, "解析 Emit 错误: {msg}"),
             Error::LimitError => write!(f, "Limit 输入 错误"),
             Error::InvalidPageError => write!(f, "输入 页码 错误"),
-            Error::InvalidParam(msg)  => write!(f, "无效参数: {msg}"),
-            Error::InternalError(msg)  => write!(f, "从bitcask取数据报错: {msg}"),
+            Error::InvalidParam(msg) => write!(f, "无效参数: {msg}"),
+            Error::InternalError(msg) => write!(f, "从bitcask取数据报错: {msg}"),
+            Error::UnsupportedCharacter(msg) => write!(f, "无效的字符: {msg}"),
+            Error::UserDoesNotExistError => write!(f, "用户不存在"),
+            Error::PermissionDoesNotExistError => write!(f, "权限不存在"),
+            Error::UserLogout => write!(f, "用户未登录"),
         }
     }
 }

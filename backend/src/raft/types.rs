@@ -2,6 +2,8 @@ use openraft::{BasicNode, declare_raft_types};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
 
+use crate::auth::types::Action;
+
 pub type NodeId = u64;
 
 // 你的 KV 写操作请求
@@ -10,7 +12,7 @@ pub enum KvOp {
     Upsert {
         key: String,
         value: String,
-        pda: Vec<u8> // 新增：由 API 层计算好传进来
+        pda: Vec<u8>, // 新增：由 API 层计算好传进来
     },
     Delete {
         key: String,
@@ -24,6 +26,14 @@ pub enum KvOp {
         fee_per_byte: u64,
         scan_fee_per_item: u64,
     },
+    SyncLogin {
+        pubkey: String,
+        permissions: Vec<Action>,
+    }, // 同步登录状态
+    SyncGrant {
+        user_pubkey: String,
+        permissions: Vec<Action>,
+    }, // 同步授权变更
 }
 
 // 写操作的响应（可选）

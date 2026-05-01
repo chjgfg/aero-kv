@@ -10,6 +10,7 @@ mod fee;
 mod utils;
 mod raft;
 
+use crate::auth::auth_config::SessionManager;
 use crate::block_chain::client::ChainClient;
 use crate::config::log_config::log_config;
 use crate::storage::engine::DiskClient;
@@ -46,6 +47,7 @@ pub type MyRaft = Raft<MyRaftConfig>; // 定义 Raft 实例类型
 pub struct AppState {
     pub chain: ChainState,
     pub storage: StorageState,
+    pub session: SessionManager, // 🌟 新增：系统/权限库状态
     // 用 Mutex 包裹，实现线程安全的修改
     pub merkle_tree: Arc<Mutex<MerkleTree<Sha256>>>,
     pub leaf_hashes: Arc<Mutex<Vec<[u8; 32]>>>,
@@ -70,6 +72,7 @@ async fn main() -> Result<()> {
     let kv_log = dir.join("kv.log");
     let app_log = dir.join("app.log");
     let raft_log = dir.join("raft.log");
+    let auth_log = dir.join("auth.log");
     
 
     let _ = log_config(app_log.to_str().unwrap());
@@ -77,17 +80,24 @@ async fn main() -> Result<()> {
     info!("开始创建client");
     let chain = Arc::new(ChainClient::new(&config)?);
     let disk = Arc::new(Mutex::new(DiskClient::new(PathBuf::from(kv_log))?));
-    // let disk = Arc::new(RwLock::new(DiskClient::new(PathBuf::from(kv_log))?));
+    let auth = Arc::new(Mutex::new(DiskClient::new(PathBuf::from(auth_log))?));
     let raft = Arc::new(Mutex::new(DiskClient::new(PathBuf::from(raft_log))?));
 
     // --- 1. 先创建共享的内存状态 ---
     let merkle_tree = Arc::new(tokio::sync::Mutex::new(MerkleTree::new()));
     let leaf_hashes = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
+    let mut session_manager = SessionManager::new(config); // 创建一次
+    // 🌟 关键：在这里初始化权限
+    // 从本地 auth.log 加载已有的用户权限到内存 DashMap
+    session_manager.init_auth(auth.clone()).await;
+
     // 3. 初始化 Raft 存储层与网络层
     let log_store = MyLogStorage { db: raft };
     let sm_store = MyStateMachine { 
         db: disk.clone(), 
+        auth_db: auth.clone(), 
+        session_manager: session_manager.clone(),
         merkle_tree: merkle_tree.clone(), // 共享引用
         leaf_hashes: leaf_hashes.clone(), // 共享引用
     };
@@ -112,6 +122,7 @@ async fn main() -> Result<()> {
     let state : Arc<AppState> = Arc::new(AppState {
         chain: chain,
         storage: disk,
+        session: session_manager.clone(),
         merkle_tree,
         leaf_hashes,
         // 修正：添加缺失的 raft 字段

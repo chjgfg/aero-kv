@@ -42,3 +42,5 @@ openraft = { version = "0.9.24", features = ["serde", "storage-v2"] }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
 anyhow = "1.0.102"
+
+dashmap = "5"  # 并发安全map，后端必须用

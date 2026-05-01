@@ -6,6 +6,8 @@ use rs_merkle::algorithms::Sha256;
 use std::io::Cursor;
 use std::sync::Arc;
 
+use crate::auth::auth_config::SessionManager;
+use crate::auth::types::UserSession;
 use crate::constants::{SYS_BASE_FEE, SYS_PAUSED};
 use crate::raft::to_storage_error;
 use crate::raft::types::{KvOp, RaftConfig, SnapshotData};
@@ -14,6 +16,8 @@ use crate::utils;
 
 pub struct MyStateMachine {
     pub db: Arc<tokio::sync::Mutex<DiskClient>>,
+    pub auth_db: Arc<tokio::sync::Mutex<DiskClient>>,
+    pub session_manager: SessionManager, // 🌟 关键：传入 SessionManager (它内部是 Arc<DashMap>)
     // 新增这两个字段，确保状态机能直接操作它们
     pub merkle_tree: Arc<tokio::sync::Mutex<MerkleTree<Sha256>>>,
     pub leaf_hashes: Arc<tokio::sync::Mutex<Vec<[u8; 32]>>>,
@@ -100,6 +104,23 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
                         let val = serde_json::to_vec(&base_fee).unwrap();
                         let _ = db.set(SYS_BASE_FEE.to_vec(), val);
                     }
+                    KvOp::SyncLogin { pubkey, permissions } => {
+                        // 🌟 当 Raft 提交日志后，所有节点的状态机都会同步更新内存中的会话
+                        self.session_manager.sessions.insert(pubkey, UserSession {
+                            is_logged_in: true,
+                            permissions,
+                        });
+                    },
+                    KvOp::SyncGrant { user_pubkey, permissions } => {
+                        // 同步持久化到 auth_db 并在内存更新
+                        // let mut auth_db = self.auth_db.lock().await;
+                        // let val = permissions.iter().map(|a| action_to_char(*a).unwrap()).collect::<String>();
+                        // let _ = auth_db.set(user_pubkey.as_bytes().to_vec(), val.into_bytes());
+                        
+                        // if let Some(mut session) = self.session_manager.sessions.get_mut(&user_pubkey) {
+                        //     session.permissions = permissions;
+                        // }
+                    }
                 }
             }
             res.push(());
@@ -124,6 +145,8 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
     async fn get_snapshot_builder(&mut self) -> Self::SnapshotBuilder {
         MyStateMachine {
             db: self.db.clone(),
+            auth_db: self.auth_db.clone(),
+            session_manager: self.session_manager.clone(), // 🌟 关键：传入 SessionManager (它内部是 Arc<DashMap>)
             merkle_tree: self.merkle_tree.clone(),
             leaf_hashes: self.leaf_hashes.clone(),
         }

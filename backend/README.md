@@ -16,7 +16,9 @@ curl -X POST http://127.0.0.1:8001/raft/init -H "Content-Type: application/json"
     "3": { "addr": "127.0.0.1:8003" }
 }'
 
-curl http://localhost/health
+curl http://localhost:8001/health
+curl http://localhost:8002/health
+curl http://localhost:8003/health
 
 curl -X POST http://localhost:8001/auth/init-admin
 curl -X POST http://localhost:8001/kv/init-counter

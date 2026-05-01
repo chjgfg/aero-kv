@@ -10,14 +10,13 @@ use axum::{
 };
 use log::info;
 use openraft::BasicNode;
-use rs_merkle::{Hasher as _, algorithms::Sha256};
 
 use crate::{
     AppState, api::{
         auth_api::AuthQuery,
         fee_api::FeeRequest,
-        kv_api::{KVQuery, KVRequest, PageRequest},
-    }, auth, block_chain, constants::VALUE_SEEDS, fee, raft::types::{KvOp, NodeId, RaftConfig}, utils::{self, ensure_leader_and_fresh}
+        kv_api::{KVQuery, KVRequest},
+    }, auth, block_chain, constants::VALUE_SEEDS, fee, raft::types::{KvOp, NodeId, RaftConfig}, utils::{self}
 };
 
 pub async fn raft_append(
@@ -236,7 +235,7 @@ pub async fn raft_fee(
 
 
 
-#[allow(dead_code)]
+/* #[allow(dead_code)]
 pub async fn raft_gets(
     State(state): State<Arc<AppState>>,
     Query(req): Query<KVQuery>,
@@ -443,3 +442,4 @@ pub async fn raft_page(
     });
     (StatusCode::OK, Json(json_response)).into_response()
 }
+ */

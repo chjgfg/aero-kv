@@ -10,6 +10,7 @@ const health = async () => {
     return data;
 }
 
+// --------------------------------------------------------------------------------------------------
 const initAuth = async () => {
     const res = await fetch(`${API_BASE}/auth/init-admin`, {
         method: "POST",
@@ -48,6 +49,21 @@ const setPause = async (paused: boolean) => {
     return data;
 }
 
+const login = async (pubkey: string) => {
+    const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 将公钥字符串传给后端
+        body: JSON.stringify({
+            pubkey: pubkey
+        }),
+    });
+    const data = await res.json();
+    console.log(data);
+    return data;
+}
+
+// --------------------------------------------------------------------------------------------------
 const initFee = async () => {
     const res = await fetch(`${API_BASE}/fee/init-fee`, {
         method: "POST",
@@ -82,6 +98,7 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
     return data;
 }
 
+// --------------------------------------------------------------------------------------------------
 const initStorage = async () => {
     const res = await fetch(`${API_BASE}/kv/init-storage`, {
         method: "POST",
@@ -218,6 +235,7 @@ const page = async (page: number, limit: number) => {
     return data;
 }
 
+// --------------------------------------------------------------------------------------------------
 export {
-    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter
+    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter, login
 }

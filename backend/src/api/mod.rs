@@ -4,11 +4,11 @@ pub mod health_api;
 pub mod kv_api;
 pub mod raft_api;
 
-pub use auth_api::init_auth;
+pub use auth_api::{admin_get, admin_page, init_auth};
 pub use fee_api::init_fee;
 pub use health_api::health;
 pub use kv_api::{gets, init_counter, init_storage, page, scan};
 pub use raft_api::{
     auth_middleware, raft_append, raft_delete, raft_fee, raft_grant, raft_init, raft_login,
-    raft_logout, raft_pause, raft_snapshot, raft_upsert, raft_vote,
+    raft_logout, raft_pause, raft_revoke, raft_snapshot, raft_upsert, raft_vote,
 };

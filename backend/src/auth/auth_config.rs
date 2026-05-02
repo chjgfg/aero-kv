@@ -8,7 +8,7 @@ use crate::{
 use dashmap::DashMap;
 use log::info;
 use solana_sdk::{signature::Keypair, signer::Signer};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
 // 这里的 DiskClient 就是你已经写好的那个
@@ -73,9 +73,21 @@ impl SessionManager {
         // 1. 先看内存有没有
         info!("auth config: {}", pubkey.to_string());
         let mut storage = auth_storage.lock().await;
-        let memory_keys: Vec<String> = self.sessions.iter().map(|entry| entry.key().clone()).collect();
-        info!("login current active session memory keys: {:?}", memory_keys);
-        let disk_keys: Vec<String> = storage.get_keys().map_err(|_| Error::InvalidKey)?.into_iter().map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey)).collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        let memory_keys: Vec<String> = self
+            .sessions
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+        info!(
+            "login current active session memory keys: {:?}",
+            memory_keys
+        );
+        let disk_keys: Vec<String> = storage
+            .get_keys()
+            .map_err(|_| Error::InvalidKey)?
+            .into_iter()
+            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
+            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
         info!("login current active session disk keys: {:?}", disk_keys);
         if let Some(mut user) = self.sessions.get_mut(&pubkey.to_string()) {
             info!("memory pubkey: {}, user: {:?}", pubkey.to_string(), user);
@@ -163,11 +175,17 @@ impl SessionManager {
         let key = user_pubkey.as_bytes().to_vec();
         let mut value_str = String::new();
         for action in perm_char.clone() {
-            let chars: &str = action_to_char(action).map_err(|_| Error::PermissionDoesNotExistError)?;
+            let chars: &str =
+                action_to_char(action).map_err(|_| Error::PermissionDoesNotExistError)?;
             // 2. 使用 push_str 拼接 &str
             value_str.push_str(chars);
         }
-        info!("grant admin_pubkey: {}, user_pubkey: {}, perm_char: {:?}", admin_pubkey.to_string(), user_pubkey.to_string(), value_str);
+        info!(
+            "grant admin_pubkey: {}, user_pubkey: {}, perm_char: {:?}",
+            admin_pubkey.to_string(),
+            user_pubkey.to_string(),
+            value_str
+        );
         let _ = storage.set(key, value_str.as_bytes().to_vec());
         let user = UserSession {
             is_logged_in: false,
@@ -180,11 +198,176 @@ impl SessionManager {
             // 如果用户不在内存里，再执行你现在的 insert 逻辑
             self.sessions.insert(user_pubkey.to_string(), user);
         }
-        let memory_keys: Vec<String> = self.sessions.iter().map(|entry| entry.key().clone()).collect();
-        info!("grant current active session memory keys: {:?}", memory_keys);
-        let disk_keys: Vec<String> = storage.get_keys().map_err(|_| Error::InvalidKey)?.into_iter().map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey)).collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        let memory_keys: Vec<String> = self
+            .sessions
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+        info!(
+            "grant current active session memory keys: {:?}",
+            memory_keys
+        );
+        let disk_keys: Vec<String> = storage
+            .get_keys()
+            .map_err(|_| Error::InvalidKey)?
+            .into_iter()
+            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
+            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
         info!("grant current active session disk keys: {:?}", disk_keys);
         Ok(perm_char)
+    }
+
+    // ------------------------------
+    // 6. 管理员取消授权（更新 DiskClient + 同步内存）
+    // ------------------------------
+    pub async fn revoke_permission(
+        &self,
+        admin_pubkey: &str,
+        user_pubkey: &str,
+        auth_storage: Arc<Mutex<DiskClient>>,
+    ) -> Result<String> {
+        let Ok(public_key) = self.admin_pubkey() else {
+            return Err(Error::UserDoesNotExistError);
+        };
+        if admin_pubkey.is_empty()
+            || (!admin_pubkey.is_empty() && admin_pubkey.to_string() != public_key.to_string())
+            || user_pubkey.is_empty()
+        {
+            return Err(Error::UserDoesNotExistError);
+        }
+        let mut storage = auth_storage.lock().await;
+
+        let key = user_pubkey.as_bytes().to_vec();
+
+        info!(
+            "revoke admin_pubkey: {}, user_pubkey: {}",
+            admin_pubkey.to_string(),
+            user_pubkey.to_string(),
+        );
+        let _ = storage.delete(key.clone());
+        self.sessions.remove(user_pubkey);
+
+        let memory_keys: Vec<String> = self
+            .sessions
+            .iter()
+            .map(|entry| entry.key().clone())
+            .collect();
+        info!(
+            "revoke current active session memory keys: {:?}",
+            memory_keys
+        );
+        let disk_keys: Vec<String> = storage
+            .get_keys()
+            .map_err(|_| Error::InvalidKey)?
+            .into_iter()
+            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
+            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        info!("revoke current active session disk keys: {:?}", disk_keys);
+        Ok(user_pubkey.to_string())
+    }
+
+    pub async fn admin_page(
+        &self,
+        mut page: usize,
+        limit: usize,
+        auth_storage: Arc<Mutex<DiskClient>>,
+    ) -> Result<(usize, HashMap<String, Vec<Action>>)> {
+        if page == 0 { page = 1; }
+        let admin_pub = self.admin_pubkey().map_err(|_| Error::UserDoesNotExistError)?;
+
+        // --- 1. 构造去重后的全量逻辑列表 ---
+        // 使用 BTreeSet 可以保证公钥排序稳定，分页时不会乱序
+        let mut all_keys_set = std::collections::BTreeSet::new();
+
+        // 注入磁盘所有的 Key
+        let mut storage = auth_storage.lock().await;
+        let disk_keys = storage.get_keys()?; // 确保你底层有这个获取所有 key 的方法
+        for k in disk_keys {
+            let key_str = String::from_utf8(k).map_err(|_| Error::InvalidKey)?;
+            if key_str != admin_pub {
+                all_keys_set.insert(key_str);
+            }
+        }
+
+        // 注入内存所有的 Key (自动去重)
+        for entry in self.sessions.iter() {
+            let k = entry.key();
+            if k != &admin_pub {
+                all_keys_set.insert(k.clone());
+            }
+        }
+
+        let total_count = all_keys_set.len(); // 🌟 准确的去重总数
+        let all_keys: Vec<String> = all_keys_set.into_iter().collect();
+
+        // --- 2. 计算切片范围 ---
+        let start = (page - 1) * limit;
+        let mut result_map = HashMap::new();
+
+        if start < total_count {
+            let end = std::cmp::min(start + limit, total_count);
+            let target_keys = &all_keys[start..end];
+
+            // --- 3. 填充数据：优先从内存取，内存没有再去磁盘取 ---
+            for key in target_keys {
+                if let Some(session) = self.sessions.get(key) {
+                    // 内存命中
+                    result_map.insert(key.clone(), session.permissions.clone());
+                } else {
+                    // 内存未命中，从磁盘读取具体 Value
+                    if let Ok(Some(v)) = storage.get(key.as_bytes().to_vec()) {
+                        let val_str = String::from_utf8(v).map_err(|_| Error::InvalidKey)?;
+                        result_map.insert(key.clone(), split_char(&val_str)?);
+                    }
+                }
+            }
+        }
+
+        info!("Admin Page: page={}, limit={}, total={}", page, limit, total_count);
+        Ok((total_count, result_map))
+    }
+
+    pub async fn admin_get(
+        &self,
+        pubkey: String,
+        limit: usize,
+        auth_storage: Arc<Mutex<DiskClient>>,
+    ) -> Result<HashMap<String, Vec<Action>>> {
+        let mut result_map = HashMap::new();
+        let admin_pub = self.admin_pubkey().map_err(|_| Error::UserDoesNotExistError)?;
+
+        // --- 1. 优先从内存筛选匹配项 ---
+        for entry in self.sessions.iter() {
+            if result_map.len() >= limit { break; } // 🌟 严格遵守 limit
+            
+            let k = entry.key();
+            if k.starts_with(&pubkey) && k != &admin_pub {
+                result_map.insert(k.clone(), entry.value().permissions.clone());
+            }
+        }
+
+        // --- 2. 如果内存没凑够，从磁盘扫描补齐 ---
+        if result_map.len() < limit {
+            let remaining = limit - result_map.len();
+            let mut storage = auth_storage.lock().await;
+            let scan_data = storage.scan_prefix(pubkey.as_bytes().to_vec());
+
+            // 使用 try_for_each 在凑够数量后可以立即停止扫描
+            scan_data.take(remaining).try_for_each(|item| -> Result<()> {
+                let (k, v) = item.map_err(|_| Error::InvalidKey)?;
+                let key_str = String::from_utf8(k).map_err(|_| Error::InvalidKey)?;
+                
+                // 排除管理员，且只添加内存中不存在的 key
+                if key_str != admin_pub && !result_map.contains_key(&key_str) {
+                    let val_str = String::from_utf8(v).map_err(|_| Error::InvalidKey)?;
+                    result_map.insert(key_str, split_char(&val_str)?);
+                }
+                Ok(())
+            })?;
+        }
+
+        info!("Admin Get: prefix='{}', found={}", pubkey, result_map.len());
+        Ok(result_map)
     }
 
     fn admin_pubkey(&self) -> Result<String> {

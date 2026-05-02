@@ -114,6 +114,54 @@ const grant = async (pubkey: string, selectedActions: Action[]) => {
     return data;
 }
 
+const revoke = async (pubkey: string,) => {
+    const savedPubkey = localStorage.getItem("my_pubkey");
+    const res = await fetch(`${API_BASE}/auth/revoke`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // 将公钥字符串传给后端
+        body: JSON.stringify({
+            admin_pubkey: savedPubkey,
+            user_pubkey: pubkey,
+        }),
+    });
+    const data = await res.json();
+    console.log("结果打印", data);
+    return data;
+}
+
+const admin_page = async (page: number, limit: number) => {
+    const res = await fetch(`${API_BASE}/auth/page`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            page: page,
+            limit: limit,
+        }),
+    });
+    const data = await res.json();
+    console.log("结果打印", data);
+    return data;
+}
+
+const admin_get = async (key: string, limit: number) => {
+    const res = await fetch(`${API_BASE}/auth/get`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+            pubkey: key,
+            limit: limit,
+        }),
+    });
+    const data = await res.json();
+    console.log("结果打印", data);
+    return data;
+}
+
 // --------------------------------------------------------------------------------------------------
 const initFee = async () => {
     const savedPubkey = localStorage.getItem("my_pubkey");
@@ -320,5 +368,6 @@ const page = async (page: number, limit: number) => {
 
 // --------------------------------------------------------------------------------------------------
 export {
-    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter, login, logout, grant
-}
+    health, initAuth, setPause, initFee, setFee, initStorage, upsert, deleted, scan, gets, page, initCounter, login, logout, grant, revoke, admin_get, admin_page
+};
+export type { Action };

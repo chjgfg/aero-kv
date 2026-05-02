@@ -3,7 +3,7 @@ import Swal from 'sweetalert2';
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-const moke = async () => {
+const mock = async () => {
     let data: any[] = [
         {
             "key": "a",
@@ -131,5 +131,5 @@ const moke = async () => {
 
 
 export {
-    moke
+    mock
 }

@@ -177,6 +177,9 @@ async fn main() -> Result<()> {
         .route("/auth/login", post(api::raft_login))
         .route("/auth/logout", post(api::raft_logout))
         .route("/auth/grant", post(api::raft_grant))
+        .route("/auth/revoke", post(api::raft_revoke))
+        .route("/auth/page", post(api::admin_page))
+        .route("/auth/get", post(api::admin_get))
         // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
         .layer(cors)
         // 注入状态（Arc<ChainClient>）

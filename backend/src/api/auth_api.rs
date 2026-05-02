@@ -4,6 +4,7 @@ use axum::{
 };
 use log::info;
 use serde::Deserialize;
+use serde_json::json;
 use std::{sync::Arc};
 
 use crate::{AppState, auth::{self, types::Action}, error::Error};
@@ -21,6 +22,14 @@ pub struct AuthRequest {
     pub user_pubkey: Option<String>,
     pub perm_char: Option<Vec<Action>>,
 }
+
+#[derive(Debug, serde::Deserialize)]
+pub struct AuthPageRequest {
+    pub pubkey: Option<String>,
+    pub page: Option<usize>,
+    pub limit: usize,
+}
+
 
 // 权限接口示例
 pub async fn init_auth(State(state): State<Arc<AppState>>, Extension(pubkey): Extension<String>,) -> impl IntoResponse {
@@ -91,5 +100,75 @@ pub async fn set_pause(
         "status": "success",
         "signature": res.to_string()
     });
+    (StatusCode::OK, Json(json_response)).into_response()
+}
+
+pub async fn admin_page(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthPageRequest>,
+) -> impl IntoResponse {
+    let Ok(page) = req.page.ok_or(|e| Error::InvalidParam(e)) else {
+        return (StatusCode::BAD_REQUEST, "admin page error").into_response();
+    };
+    let auth_storage = state.session.auth_storage.clone();
+    let limit = req.limit;
+    let Ok(res) = state.session.admin_page(page, limit, auth_storage).await else {
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "admin page error",
+        });
+        return (StatusCode::NOT_MODIFIED, Json(json_response)).into_response();
+    };
+    // 🌟 将 HashMap 转换为 Vec<{pubkey, permissions}> 以保证 JSON 格式友好
+    let auth_list: Vec<_> = res.1.into_iter()
+        .map(|(pubkey, permissions)| {
+            json!({
+                "pubkey": pubkey,
+                "permissions": permissions
+            })
+        })
+        .collect();
+
+    let json_response = json!({
+        "status": "success",
+        "total": res.0,      // 🌟 返回总条数供前端分页器使用
+        "auth_list": auth_list // 🌟 返回列表供前端表格使用
+    });
+
+    (StatusCode::OK, Json(json_response)).into_response()
+}
+
+
+pub async fn admin_get(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthPageRequest>,
+) -> impl IntoResponse {
+    let auth_storage = state.session.auth_storage.clone();
+    let Some(pubkey) = req.pubkey else {
+        return (StatusCode::BAD_REQUEST, "admin get error").into_response();
+    };
+    let limit = req.limit;
+    let Ok(res) = state.session.admin_get(pubkey, limit, auth_storage).await else {
+        let json_response = serde_json::json!({
+            "status": "error",
+            "signature": "admin get error",
+        });
+        return (StatusCode::NOT_MODIFIED, Json(json_response)).into_response();
+    };
+    // 🌟 将 HashMap 转换为 Vec<{pubkey, permissions}> 以保证 JSON 格式友好
+    let auth_list: Vec<_> = res.into_iter()
+        .map(|(pubkey, permissions)| {
+            json!({
+                "pubkey": pubkey,
+                "permissions": permissions
+            })
+        })
+        .collect();
+
+    let json_response = json!({
+        "status": "success",
+        "auth_list": auth_list // 🌟 返回列表供前端表格使用
+    });
+
     (StatusCode::OK, Json(json_response)).into_response()
 }

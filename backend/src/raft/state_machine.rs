@@ -126,6 +126,14 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
                             session.permissions = permissions;
                         }
                     }
+                    KvOp::SyncRevoke { user_pubkey } => {
+                        // 1. 同步持久化层：从 auth_db 中删除权限记录
+                        let mut auth_db = self.auth_db.lock().await;
+                        let _ = auth_db.delete(user_pubkey.as_bytes().to_vec());
+                        // 2. 同步内存层：从 session_manager 中移除会话
+                        self.session_manager.sessions.remove(&user_pubkey);
+                        info!("Raft SyncRevoke: removed permissions for {}", user_pubkey);
+                    }
                 }
             }
             res.push(());

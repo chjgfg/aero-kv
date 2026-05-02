@@ -26,7 +26,7 @@ async fn main() {
             "http://127.0.0.1:8002".to_string(),
             "http://127.0.0.1:8003".to_string(),
         ],
-        current_leader: RwLock::new("http://127.0.0.1:8001".to_string()),
+        current_leader: RwLock::new("http://127.0.0.1:8002".to_string()),
         rr_index: AtomicUsize::new(0),
     });
 

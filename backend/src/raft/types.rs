@@ -37,6 +37,9 @@ pub enum KvOp {
         user_pubkey: String,
         permissions: Vec<Action>,
     }, // 同步授权变更
+    SyncRevoke {
+        user_pubkey: String 
+    },
 }
 
 // 写操作的响应（可选）

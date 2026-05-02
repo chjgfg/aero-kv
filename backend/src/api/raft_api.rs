@@ -612,3 +612,40 @@ pub async fn raft_grant(
         }
     }
 }
+
+
+pub async fn raft_revoke(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<AuthRequest>,
+) -> impl IntoResponse {
+    let auth_storage = state.session.auth_storage.clone();
+    let Some(admin_pubkey) = req.admin_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    let Some(user_pubkey) = req.user_pubkey else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    info!("admin_pubkey: {}, user_pubkey: {}", admin_pubkey, user_pubkey);
+    let Ok(res) = state.session.revoke_permission(admin_pubkey.as_str(), &user_pubkey, auth_storage.clone(),).await else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
+    };
+    
+    let op = KvOp::SyncRevoke { user_pubkey };
+    
+    match state.raft.client_write(op).await {
+        Ok(_) => {
+            info!("revoke write raft ok");
+            // 登录成功，返回用户信息
+            Json(res).into_response()
+        }
+        Err(e) => {
+            // 🌟 错误响应也可以直接返回 Result 的 Err 分支
+            // 或者手动构造一个 Response
+            let error_response = (
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("Raft Consensus Error: {:?}", e),
+            );
+            error_response.into_response()
+        }
+    }
+}

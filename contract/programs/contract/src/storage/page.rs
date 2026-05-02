@@ -64,7 +64,7 @@ pub fn page(ctx: Context<Page>, keys: Vec<Vec<u8>>) -> Result<()> {
 
     // 收费逻辑不变
     let fee = ctx.accounts.fee_config.base_fee * count as u64;
-    charge(&ctx.accounts.signer, &ctx.accounts.treasury, fee)?;
+    charge(&ctx.accounts.signer, &ctx.accounts.treasury, &ctx.accounts.system_program.to_account_info(), fee)?;
 
     // 1. 获取 counter 账户（假设你已经在 Context 里引入了它）
     let counter = &ctx.accounts.counter;

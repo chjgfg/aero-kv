@@ -55,6 +55,7 @@ pub fn delete(ctx: Context<Delete>, _key: Vec<u8>) -> Result<()> {
     charge(
         &ctx.accounts.signer,
         &ctx.accounts.treasury.to_account_info(),
+        &ctx.accounts.system_program.to_account_info(), // 🌟 传给辅助函数
         fee,
     )?;
 

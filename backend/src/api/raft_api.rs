@@ -7,6 +7,7 @@ use axum::{
 };
 use log::info;
 use openraft::BasicNode;
+use serde_json::json;
 
 use crate::{
     AppState,
@@ -246,7 +247,7 @@ pub async fn raft_fee(
     Extension(pubkey): Extension<String>,
     Json(req): Json<FeeRequest>,
 ) -> impl IntoResponse {
-    info!("pubkey: {}", pubkey);
+    info!("raft fee pubkey: {}", pubkey);
     let Ok(_) = state.session.check_permission(&pubkey, Action::RaftFee) else {
         // 🌟 在这里必须显式返回一个 Response
         return (StatusCode::FORBIDDEN, "Permission denied").into_response();
@@ -272,7 +273,7 @@ pub async fn raft_fee(
                     (StatusCode::OK, Json(json_response)).into_response()
                 }
                 Err(_) => {
-                    (StatusCode::INTERNAL_SERVER_ERROR, "chain set_fee error").into_response()
+                    (StatusCode::INTERNAL_SERVER_ERROR, "chain set fee error").into_response()
                 }
             }
         }
@@ -509,15 +510,21 @@ pub async fn raft_login(
     };
 
     let op = KvOp::SyncLogin {
-        pubkey: user_pubkey,
-        permissions: res.clone().permissions,
+        pubkey: user_pubkey.clone(),
+        permissions: res.clone().1.permissions,
     };
 
     match state.raft.client_write(op).await {
         Ok(_) => {
             info!("login write raft ok");
             // 登录成功，返回用户信息
-            Json(res).into_response()
+            let json = json!({
+                "status": "success",
+                "is_admin": res.clone().0, // 返回给前端
+                "pubkey": user_pubkey.clone(),
+                "permissions": res.clone().1.permissions
+            });
+            Json(json).into_response()
         }
         Err(e) => {
             // 🌟 错误响应也可以直接返回 Result 的 Err 分支
@@ -539,6 +546,7 @@ pub async fn raft_logout(
         return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
     };
     let pubkey = user_pubkey.as_str();
+    info!("logout pubkey: {}", pubkey);
     let Ok(res) = state.session.logout(pubkey).await else {
         return (StatusCode::INTERNAL_SERVER_ERROR, "chain logout error").into_response();
     };

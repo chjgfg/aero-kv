@@ -59,10 +59,12 @@ pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> 
 
     // 收费逻辑（保留原有）
     let fee_config = &ctx.accounts.fee_config;
+    // 基础费用+字节数*一字节的费用
     let fee = fee_config.base_fee + (value.len() as u64 * fee_config.fee_per_byte);
     charge(
         &ctx.accounts.signer,
         &ctx.accounts.treasury.to_account_info(),
+        &ctx.accounts.system_program.to_account_info(),
         fee,
     )?;
 

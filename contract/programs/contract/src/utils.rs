@@ -23,14 +23,40 @@ use crate::error::Error;
 //     a.cmp(b)
 // }
 
-pub fn charge(payer: &Signer, treasury: &AccountInfo, amount: u64) -> Result<()> {
+// pub fn charge(payer: &Signer, treasury: &AccountInfo, amount: u64) -> Result<()> {
+//     require!(
+//         **payer.to_account_info().lamports.borrow() >= amount,
+//         Error::InsufficientFee
+//     );
+
+//     **payer.to_account_info().try_borrow_mut_lamports()? -= amount;
+//     **treasury.try_borrow_mut_lamports()? += amount;
+
+//     Ok(())
+// }
+
+// 增加 system_program 参数
+pub fn charge<'info>(
+    payer: &Signer<'info>,
+    treasury: &AccountInfo<'info>,
+    system_program: &AccountInfo<'info>, // 🌟 新增这个参数
+    amount: u64,
+) -> Result<()> {
     require!(
         **payer.to_account_info().lamports.borrow() >= amount,
         Error::InsufficientFee
     );
 
-    **payer.to_account_info().try_borrow_mut_lamports()? -= amount;
-    **treasury.try_borrow_mut_lamports()? += amount;
+    // 🌟 使用传入的 system_program 账户
+    let cpi_context = CpiContext::new(
+        system_program.clone(),
+        anchor_lang::system_program::Transfer {
+            from: payer.to_account_info(),
+            to: treasury.clone(),
+        },
+    );
+
+    anchor_lang::system_program::transfer(cpi_context, amount)?;
 
     Ok(())
 }

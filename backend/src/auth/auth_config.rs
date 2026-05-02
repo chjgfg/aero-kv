@@ -69,30 +69,19 @@ impl SessionManager {
         &self,
         pubkey: &str,
         auth_storage: Arc<Mutex<DiskClient>>,
-    ) -> Result<UserSession> {
+    ) -> Result<(bool, UserSession)> {
+        let is_admin = pubkey == self.admin_pubkey()?;
         // 1. 先看内存有没有
         info!("auth config: {}", pubkey.to_string());
         let mut storage = auth_storage.lock().await;
-        let memory_keys: Vec<String> = self
-            .sessions
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect();
-        info!(
-            "login current active session memory keys: {:?}",
-            memory_keys
-        );
-        let disk_keys: Vec<String> = storage
-            .get_keys()
-            .map_err(|_| Error::InvalidKey)?
-            .into_iter()
-            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
-            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        let memory_keys: Vec<String> = self.sessions.iter().map(|entry| entry.key().clone()).collect();
+        info!("login current active session memory keys: {:?}", memory_keys);
+        let disk_keys: Vec<String> = storage.get_keys().map_err(|_| Error::InvalidKey)?.into_iter().map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey)).collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
         info!("login current active session disk keys: {:?}", disk_keys);
         if let Some(mut user) = self.sessions.get_mut(&pubkey.to_string()) {
             info!("memory pubkey: {}, user: {:?}", pubkey.to_string(), user);
             user.is_logged_in = true;
-            return Ok(user.clone());
+            return Ok((is_admin, user.clone()));
         }
 
         // 2. 内存没有，去磁盘查
@@ -106,7 +95,7 @@ impl SessionManager {
             };
             // 同步回内存
             self.sessions.insert(pubkey.to_string(), user.clone());
-            return Ok(user);
+            return Ok((is_admin, user));
         }
         Err(Error::UserDoesNotExistError)
     }
@@ -119,6 +108,7 @@ impl SessionManager {
         match self.sessions.get_mut(&permissions) {
             Some(mut user) => {
                 user.is_logged_in = false;
+                info!("user.is_logged_in: {}", user.is_logged_in);
                 Ok(permissions)
             }
             None => Err(Error::UserDoesNotExistError),
@@ -180,12 +170,7 @@ impl SessionManager {
             // 2. 使用 push_str 拼接 &str
             value_str.push_str(chars);
         }
-        info!(
-            "grant admin_pubkey: {}, user_pubkey: {}, perm_char: {:?}",
-            admin_pubkey.to_string(),
-            user_pubkey.to_string(),
-            value_str
-        );
+        info!("grant admin_pubkey: {}, user_pubkey: {}, perm_char: {:?}", admin_pubkey.to_string(), user_pubkey.to_string(), value_str);
         let _ = storage.set(key, value_str.as_bytes().to_vec());
         let user = UserSession {
             is_logged_in: false,
@@ -198,21 +183,9 @@ impl SessionManager {
             // 如果用户不在内存里，再执行你现在的 insert 逻辑
             self.sessions.insert(user_pubkey.to_string(), user);
         }
-        let memory_keys: Vec<String> = self
-            .sessions
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect();
-        info!(
-            "grant current active session memory keys: {:?}",
-            memory_keys
-        );
-        let disk_keys: Vec<String> = storage
-            .get_keys()
-            .map_err(|_| Error::InvalidKey)?
-            .into_iter()
-            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
-            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        let memory_keys: Vec<String> = self.sessions.iter().map(|entry| entry.key().clone()).collect();
+        info!("grant current active session memory keys: {:?}", memory_keys);
+        let disk_keys: Vec<String> = storage.get_keys().map_err(|_| Error::InvalidKey)?.into_iter().map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey)).collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
         info!("grant current active session disk keys: {:?}", disk_keys);
         Ok(perm_char)
     }
@@ -239,29 +212,13 @@ impl SessionManager {
 
         let key = user_pubkey.as_bytes().to_vec();
 
-        info!(
-            "revoke admin_pubkey: {}, user_pubkey: {}",
-            admin_pubkey.to_string(),
-            user_pubkey.to_string(),
-        );
+        info!("revoke admin_pubkey: {}, user_pubkey: {}", admin_pubkey.to_string(), user_pubkey.to_string(),);
         let _ = storage.delete(key.clone());
         self.sessions.remove(user_pubkey);
 
-        let memory_keys: Vec<String> = self
-            .sessions
-            .iter()
-            .map(|entry| entry.key().clone())
-            .collect();
-        info!(
-            "revoke current active session memory keys: {:?}",
-            memory_keys
-        );
-        let disk_keys: Vec<String> = storage
-            .get_keys()
-            .map_err(|_| Error::InvalidKey)?
-            .into_iter()
-            .map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey))
-            .collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
+        let memory_keys: Vec<String> = self.sessions.iter().map(|entry| entry.key().clone()).collect();
+        info!("revoke current active session memory keys: {:?}", memory_keys);
+        let disk_keys: Vec<String> = storage.get_keys().map_err(|_| Error::InvalidKey)?.into_iter().map(|item| String::from_utf8(item).map_err(|_| Error::InvalidKey)).collect::<Result<Vec<String>>>()?; // 🌟 3. 处理转换可能失败的情况        
         info!("revoke current active session disk keys: {:?}", disk_keys);
         Ok(user_pubkey.to_string())
     }

@@ -113,8 +113,8 @@ const mock = async () => {
             console.log(item);
             await upsert(item.key, item.value);
             // 注意：你注释写等待 2s，但代码是 2000 ms
-            await sleep(2000);
-            console.log('2000 ms 后执行');
+            // await sleep(2000);
+            // console.log('2000 ms 后执行');
         } catch (e) {
             // 🛑 第一次报错就在这里捕获
             // console.error("遇到错误，停止后续操作:", e);

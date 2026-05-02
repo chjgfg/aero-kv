@@ -56,8 +56,9 @@ pub fn scan(ctx: Context<Scan>, start_key: Vec<u8>, limit: u64, keys: Vec<Vec<u8
     }
 
     // 收费逻辑不变
+    // 基础费用*条数
     let fee = ctx.accounts.fee_config.base_fee * count as u64;
-    charge(&ctx.accounts.signer, &ctx.accounts.treasury, fee)?;
+    charge(&ctx.accounts.signer, &ctx.accounts.treasury, &ctx.accounts.system_program.to_account_info(),fee)?;
 
     Ok(())
 }

@@ -71,9 +71,12 @@ const login = async (pubkey: string) => {
     });
     const data = await res.json();
     console.log(data);
+    // console.log(res);
     if (res.ok) {
         // 🌟 登录成功，把公钥存起来
         localStorage.setItem("my_pubkey", pubkey);
+        localStorage.setItem("is_admin", data.is_admin);
+        localStorage.setItem("permissions", data.permissions);
     }
     return data;
 }
@@ -90,9 +93,12 @@ const logout = async () => {
     });
     const data = await res.json();
     console.log(data);
+    console.log(res);
     if (res.ok) {
         // 🌟 登录成功，把公钥存起来
         localStorage.removeItem("my_pubkey");
+        localStorage.removeItem("is_admin"); // 如果你存了管理员标识
+        localStorage.removeItem("permissions"); // 如果你存了管理员标识
     }
     return data;
 }
@@ -199,6 +205,7 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
     }
 
     const data = await res.json();
+    console.log(res);
     console.log(data);
     return data;
 }

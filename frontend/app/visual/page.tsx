@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import withAuth from "@/components/withAuth";
 
-export default function VisualPage() {
+function VisualPage() {
     const [proofData, setProofData] = useState<any>(null);
 
     useEffect(() => {
@@ -115,3 +116,6 @@ export default function VisualPage() {
         </div>
     );
 }
+
+// 2. 在文件底部，先用 withAuth 包裹，再导出
+export default withAuth(VisualPage);

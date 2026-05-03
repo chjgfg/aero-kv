@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use axum::{
-    Extension, Json, body::Body, extract::{Query, State}, http::{Request, StatusCode}, middleware::Next, response::{IntoResponse, Response}
+    Extension, Json, body::Body, extract::{Query, State}, http::{Request, StatusCode, header}, middleware::Next, response::{IntoResponse, Response}
 };
 use log::info;
-use openraft::BasicNode;
+use openraft::{BasicNode, error::{CheckIsLeaderError, RaftError}};
 use serde_json::json;
 
 use crate::{
@@ -47,6 +47,84 @@ pub async fn auth_middleware(
 
     // 3. 继续执行后续逻辑
     next.run(req).await
+}
+
+pub async fn leader_forwarding_middleware(
+    State(state): State<Arc<AppState>>,
+    req: Request<axum::body::Body>,
+    next: Next,
+) -> Response {
+    // 1. 检查自己是不是 Leader
+    match state.raft.is_leader().await {
+        Ok(_) => {
+            // 是 Leader，直接执行本地 Handler
+            next.run(req).await
+        }
+        Err(e) => {
+            match e {
+                // 🌟 适配 OpenRaft 的错误嵌套结构
+                RaftError::APIError(CheckIsLeaderError::ForwardToLeader(f)) => {
+                    let leader_addr = match f.leader_node {
+                        Some(node) => node.addr,
+                        None => return (StatusCode::SERVICE_UNAVAILABLE, "No leader found").into_response(),
+                    };
+
+                    // 2. 构造转发逻辑
+                    let client = reqwest::Client::new();
+                    
+                    // 🌟 核心：解构请求以获取 Parts (Headers) 和 Body
+                    let (parts, body) = req.into_parts();
+                    let method = parts.method.clone();
+                    let uri = format!("http://{}{}", leader_addr, parts.uri.path_and_query().map(|x| x.as_str()).unwrap_or(""));
+                    
+                    // 提取 Body 字节[cite: 1]
+                    let body_bytes = match axum::body::to_bytes(body, 100 * 1024 * 1024).await {
+                        Ok(b) => b,
+                        Err(_) => return StatusCode::BAD_REQUEST.into_response(),
+                    };
+
+                    // 🌟 核心修复：通过字符串转换 Method，绕过 http 库版本冲突[cite: 1]
+                    let reqwest_method = reqwest::Method::from_bytes(method.as_str().as_bytes()).unwrap();
+
+                    // 3. 构造转发请求并【复制 Headers】[cite: 1]
+                    let mut forward_req = client.request(reqwest_method, &uri)
+                        .body(reqwest::Body::from(body_bytes));
+
+                    // 🌟 修复 415 错误：必须带上 Content-Type 等原始请求头[cite: 1]
+                    // 🌟 修复：将 axum 的 Header 转换为字符串，再传给 reqwest
+                    for (key, value) in parts.headers.iter() {
+                        if key != header::HOST {
+                            // 使用 as_str() 转换为字符串，绕过版本不兼容的类型限制
+                            forward_req = forward_req.header(key.as_str(), value.as_bytes());
+                        }
+                    }
+                    // 4. 执行转发并处理响应[cite: 1]
+                    match forward_req.send().await {
+                        Ok(resp) => {
+                            let status = StatusCode::from_u16(resp.status().as_u16()).unwrap();
+                            
+                            // 🌟 构造响应并回传 Leader 返回的 Headers (如 Content-Type)[cite: 1]
+                            let mut response_builder = Response::builder().status(status);
+                            
+                            // 🌟 修复：将 reqwest 的 Header 转换为字符串，再回传给 axum
+                            for (key, value) in resp.headers().iter() {
+                                // 同样通过 as_str 和 as_bytes 进行中转
+                                response_builder = response_builder.header(key.as_str(), value.as_bytes());
+                            }
+
+                            let data = resp.bytes().await.unwrap_or_default();
+                            response_builder
+                                .body(axum::body::Body::from(data))
+                                .unwrap()
+                                .into_response()
+                        }
+                        Err(_) => (StatusCode::BAD_GATEWAY, "Failed to forward to leader").into_response(),
+                    }
+                }
+                _ => (StatusCode::INTERNAL_SERVER_ERROR, "Raft internal error").into_response(),
+            }
+        }
+    }
 }
 
 pub async fn raft_append(

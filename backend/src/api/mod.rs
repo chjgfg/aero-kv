@@ -9,6 +9,7 @@ pub use fee_api::init_fee;
 pub use health_api::health;
 pub use kv_api::{gets, init_counter, init_storage, page, scan};
 pub use raft_api::{
-    auth_middleware, raft_append, raft_delete, raft_fee, raft_grant, raft_init, raft_login,
-    raft_logout, raft_pause, raft_revoke, raft_snapshot, raft_upsert, raft_vote,
+    auth_middleware, leader_forwarding_middleware, raft_append, raft_delete, raft_fee, raft_grant,
+    raft_init, raft_login, raft_logout, raft_pause, raft_revoke, raft_snapshot, raft_upsert,
+    raft_vote,
 };

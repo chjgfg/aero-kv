@@ -166,12 +166,7 @@ async fn main() -> Result<()> {
     // 4. 注册路由（Axum 0.8.x 标准写法）
     let app = Router::new()
         .merge(protected_routes) // 合并受保护的路由
-        // --- Raft 内部 RPC 路由 (必须添加) ---
-        .route("/raft/init", post(api::raft_init))
-        .route("/raft/append", post(api::raft_append))
-        .route("/raft/vote", post(api::raft_vote))
-        .route("/raft/snapshot", post(api::raft_snapshot))
-        
+
         .route("/health", get(api::health))
 
         .route("/auth/login", post(api::raft_login))
@@ -180,6 +175,17 @@ async fn main() -> Result<()> {
         .route("/auth/revoke", post(api::raft_revoke))
         .route("/auth/page", post(api::admin_page))
         .route("/auth/get", post(api::admin_get))
+        // --------------------------------------------------
+        // 🌟 Raft 转发中间件：加在这里！
+        // 它会包裹上面所有的路由（包括权限组和非权限组）
+        // --------------------------------------------------
+        .layer(middleware::from_fn_with_state(state.clone(), api::leader_forwarding_middleware))
+        // --- Raft 内部 RPC 路由 (必须添加) ---
+        .route("/raft/init", post(api::raft_init))
+        .route("/raft/append", post(api::raft_append))
+        .route("/raft/vote", post(api::raft_vote))
+        .route("/raft/snapshot", post(api::raft_snapshot))
+        
         // 添加 CORS 中间件，允许所有来源（开发用，生产环境限制域名）
         .layer(cors)
         // 注入状态（Arc<ChainClient>）

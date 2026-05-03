@@ -219,7 +219,7 @@ function AuthManagePage() {
             <td className="px-6 py-4">
                 <div className="flex gap-2 justify-center">
                     <button 
-                        onClick={() => setTargetUserKey(item.pubkey)} 
+                        onClick={() => {setTargetUserKey(item.pubkey); setSelectedActions(item.permissions as Action[]);}} 
                         className="px-3 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-lg border border-emerald-600/30 hover:bg-emerald-600/40 transition-all font-bold text-[10px] whitespace-nowrap"
                     >
                         授权

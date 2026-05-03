@@ -10,6 +10,8 @@ export default function LoginPage() {
     const router = useRouter();
 
     const handleLogin = async () => {
+        console.log("pubkey:", pubkey);
+        console.log("pubkey.length:", pubkey.length);
         if (pubkey.length < 32) {
             alert("请输入正确的公钥");
             return;

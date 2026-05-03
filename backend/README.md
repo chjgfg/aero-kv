@@ -55,3 +55,7 @@ curl -X POST http://localhost:8003/kv/page -H "Content-Type: application/json" -
 
 
 ```
+
+```shell
+watch -n 0.5 -d solana balance EEaY9dK48vWRdKYrRmDfPcnTaee6wDYRUHbNozsUjJYw
+```

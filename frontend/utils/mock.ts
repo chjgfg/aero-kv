@@ -1,5 +1,6 @@
 import { upsert } from "./http";
 import Swal from 'sweetalert2';
+import { toast } from "sonner";
 
 const sleep = async (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -112,9 +113,10 @@ const mock = async () => {
         try {
             console.log(item);
             await upsert(item.key, item.value);
-            // 注意：你注释写等待 2s，但代码是 2000 ms
-            // await sleep(2000);
-            // console.log('2000 ms 后执行');
+            toast.success("操作成功", {
+                description: `已成功插入 ${item.key}`,
+                position: "bottom-right", // 定位在右下角
+            });
         } catch (e) {
             // 🛑 第一次报错就在这里捕获
             // console.error("遇到错误，停止后续操作:", e);
@@ -127,6 +129,12 @@ const mock = async () => {
             break;
         }
     }
+    Swal.fire({
+        title: '写入完成',
+        text: `已成功插入 ${data.length}条数据, 请刷新页面`,
+        icon: 'success', // 核心修改：图标改为 success
+        confirmButtonText: '太棒了'
+    });
 }
 
 

@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
-    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, VALUE_SEEDS},
+    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, SYS_BASE_FEE, SYS_PAUSED, VALUE_SEEDS},
     error::Error,
     fee::FeeConfig,
     storage::structs::{KvCounter, ValueAccount},
@@ -41,7 +41,13 @@ pub struct Delete<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn delete(ctx: Context<Delete>, _key: Vec<u8>) -> Result<()> {
+pub fn delete(ctx: Context<Delete>, key: Vec<u8>) -> Result<()> {
+    // 1. 安全拦截：禁止删除系统配置 Key
+    // 使用 == 进行精确匹配判断
+    if key == SYS_PAUSED || key == SYS_BASE_FEE {
+        msg!("Security Alert: Attempt to delete system key intercepted!");
+        return Err(Error::UnauthorizedAccess.into()); 
+    }
     msg!("Value PDA: {:?}", ctx.accounts.value_account.key());
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);

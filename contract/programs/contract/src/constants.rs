@@ -11,3 +11,6 @@ pub const FEE_SEEDS: &[u8] = "fee".as_bytes();
 // pub const NODE_SEEDS: &[u8] = "node".as_bytes();
 pub const VALUE_SEEDS: &[u8] = "value".as_bytes();
 pub const COUNTER_SEEDS: &[u8] = "counter".as_bytes();
+
+pub const SYS_PAUSED: &[u8] = "sys_paused".as_bytes();
+pub const SYS_BASE_FEE: &[u8] = "sys_base_fee".as_bytes();

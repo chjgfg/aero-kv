@@ -98,10 +98,13 @@ impl RaftStateMachine<RaftConfig> for MyStateMachine {
                         info!("raft paused key: {:?}", SYS_PAUSED);
                         let _ = db.set(SYS_PAUSED.to_vec(), vec![paused as u8]);
                     }
-                    KvOp::SetFee { base_fee, .. } => {
-                        info!("raft fee key: {:?}", SYS_BASE_FEE);
-                        // 这里可以根据需要存储完整的手续费结构体
-                        let val = serde_json::to_vec(&base_fee).unwrap();
+                    KvOp::SetFee { base_fee, fee_per_byte, scan_fee_per_item } => {
+                        let config = serde_json::json!({
+                            "base_fee": base_fee,
+                            "fee_per_byte": fee_per_byte,
+                            "scan_fee": scan_fee_per_item
+                        });
+                        let val = serde_json::to_vec(&config).unwrap();
                         let _ = db.set(SYS_BASE_FEE.to_vec(), val);
                     }
                     KvOp::SyncLogin { pubkey, permissions } => {

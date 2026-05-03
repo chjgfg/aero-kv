@@ -9,7 +9,10 @@ use crate::{
         client::ChainClient,
         types::{KVEvent, ValueAccount},
     },
-    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, SYS_BASE_FEE, SYS_PAUSED, VALUE_SEEDS},
+    constants::{
+        AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, HEAD_SEEDS, META_SEEDS, SYS_BASE_FEE, SYS_PAUSED,
+        VALUE_SEEDS,
+    },
     error::{Error, Result},
     storage::engine::DiskClient,
     utils::bytes_to_str,
@@ -233,6 +236,10 @@ pub async fn upsert(
 }
 
 pub async fn get(chain: Arc<ChainClient>, key: Vec<u8>) -> Result<String> {
+    if key == SYS_PAUSED || key == SYS_BASE_FEE {
+        info!("跳过系统配置项: {:?}", key);
+        return Err(Error::InvalidKey);
+    }
     info!("backend get key: {:?}", key);
 
     let (auth_pda, _) = chain.find_pda(AUTH_SEEDS);
@@ -303,6 +310,11 @@ pub async fn delete(
     storage: Arc<Mutex<DiskClient>>,
     key: Vec<u8>,
 ) -> Result<Signature> {
+    if key == SYS_PAUSED || key == SYS_BASE_FEE {
+        info!("跳过系统配置项: {:?}", key);
+        return Err(Error::InvalidKey);
+    }
+
     info!("backend delete key: {:?}", key);
 
     let (value_pda, _) = chain.find_pda(&[VALUE_SEEDS, key.as_slice()]);
@@ -423,7 +435,11 @@ pub async fn scan(
     }
 
     // 把 key 列表通过指令数据传给合约
-    let keys: Vec<Vec<u8>> = k_v.iter().map(|(k, _)| k.clone()).collect();
+    let keys: Vec<Vec<u8>> = k_v
+        .iter()
+        .filter(|(k, _)| k != &*SYS_PAUSED && k != &*SYS_BASE_FEE)
+        .map(|(k, _)| k.clone())
+        .collect();
     let args = instruction::Scan {
         start: start.clone(),
         limit,
@@ -619,7 +635,11 @@ pub async fn page(
     }
 
     // 把 key 列表通过指令数据传给合约
-    let keys: Vec<Vec<u8>> = page_data.iter().map(|(k, _)| k.clone()).collect();
+    let keys: Vec<Vec<u8>> = page_data
+        .iter()
+        .filter(|(k, _)| k != &*SYS_PAUSED && k != &*SYS_BASE_FEE)
+        .map(|(k, _)| k.clone())
+        .collect();
     let args = instruction::Page { keys };
     info!("从bitcask取的数据: {:?}", page_data);
     // ==============================
@@ -640,8 +660,9 @@ pub async fn page(
             warn!("跳过长度非 32 字节的数据 (Key: {:?})", key);
             continue;
         }
-        info!("Key: {}, PDA Raw Data (Hex): {}", 
-            String::from_utf8_lossy(&key), 
+        info!(
+            "Key: {}, PDA Raw Data (Hex): {}",
+            String::from_utf8_lossy(&key),
             hex::encode(&pda)
         );
         // let (pda, _) = chain.find_pda(&[VALUE_SEEDS, &key]);
@@ -781,6 +802,7 @@ pub async fn page(
     // ======================================================
     // 🔥 关键：每次读取 total 都新建客户端，彻底避免缓存
     // ======================================================
-    let total = total_from_log.ok_or_else(|| {Error::RpcError("counter account not found".to_string())})?;
+    let total =
+        total_from_log.ok_or_else(|| Error::RpcError("counter account not found".to_string()))?;
     Ok((results, total))
 }

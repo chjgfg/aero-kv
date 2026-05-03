@@ -428,6 +428,8 @@ const upsert = async (key: string, value: string) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        // 🌟 必须加上这一行！抛出错误，外层才能捕获到
+        throw err;
     }
 }
 

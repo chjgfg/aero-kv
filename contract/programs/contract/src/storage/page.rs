@@ -1,6 +1,6 @@
 use crate::{
     auth::structs::AuthConfig,
-    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS},
+    constants::{AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, SYS_BASE_FEE, SYS_PAUSED},
     error::Error,
     fee::FeeConfig,
     storage::structs::{KVEvent, KvCounter, ValueAccount},
@@ -30,10 +30,16 @@ pub struct Page<'info> {
 
 pub fn page(ctx: Context<Page>, keys: Vec<Vec<u8>>) -> Result<()> {
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
-
+    // 🌟 安全检查 1：确保 Key 和 账户数量严格对应，防止索引偏移
+    require!(keys.len() == ctx.remaining_accounts.len(), Error::IndexMismatch);
     let mut count = 0;
     // 用 zip 把 remaining_accounts 和 keys 一一对应
     for (acc, key) in ctx.remaining_accounts.iter().zip(keys) {
+        // 🌟 使用 == 进行精确匹配判断
+        if key == SYS_PAUSED || key == SYS_BASE_FEE {
+            msg!("Security: Exact match for system key, skipping...");
+            continue;
+        }
         // 1. 读取账户数据
         let data = match acc.try_borrow_data() {
             Ok(d) => d,

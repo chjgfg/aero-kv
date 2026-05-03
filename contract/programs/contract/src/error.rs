@@ -20,4 +20,8 @@ pub enum Error {
     InsufficientFee,
     #[msg("System paused")]
     Paused,
+    #[msg("Index mismatch")]
+    IndexMismatch,
+    #[msg("Unauthorized access")]
+    UnauthorizedAccess
 }

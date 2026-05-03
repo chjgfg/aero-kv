@@ -126,7 +126,7 @@ const mock = async () => {
                 icon: 'error',
                 confirmButtonText: '知道了'
             });
-            break;
+            return;
         }
     }
     Swal.fire({

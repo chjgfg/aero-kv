@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
-    constants::{AUTH_SEEDS, FEE_SEEDS},
+    constants::{AUTH_SEEDS, FEE_SEEDS, SYS_BASE_FEE, SYS_PAUSED},
     error::Error,
     fee::FeeConfig,
     storage::structs::{KVEvent, ValueAccount},
@@ -24,12 +24,15 @@ pub struct Scan<'info> {
 
 pub fn scan(ctx: Context<Scan>, start_key: Vec<u8>, limit: u64, keys: Vec<Vec<u8>>) -> Result<()> {
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
-
+    require!(keys.len() == ctx.remaining_accounts.len(), Error::IndexMismatch);
     let mut count = 0;
     // 用 zip 把 remaining_accounts 和 keys 一一对应
     for (acc, key) in ctx.remaining_accounts.iter().zip(keys) {
         if count >= limit { break; }
-
+        if key == SYS_PAUSED || key == SYS_BASE_FEE {
+            msg!("Security: Exact match for system key, skipping...");
+            continue;
+        }
         // 1. 读取账户数据
         let data = match acc.try_borrow_data() {
             Ok(d) => d, Err(_) => continue,

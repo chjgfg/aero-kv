@@ -140,7 +140,7 @@ async fn main() -> Result<()> {
         .expose_headers(Any)
         .allow_credentials(false);
 
-        // --- 第一组：受保护的接口 ---
+    // --- 第一组：受保护的接口 ---
     let protected_routes = Router::new()
         // KV 接口
         .route("/kv/init-storage", post(api::init_storage))

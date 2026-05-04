@@ -23,56 +23,60 @@ const mock = async () => {
             "value": "a4",
         },
         {
-            "key": "aaaaaa",
+            "key": "aaaaa",
             "value": "a5",
         },
         {
-            "key": "aaaaaaa",
+            "key": "aaaaaa",
             "value": "a6",
         },
         {
-            "key": "aaaaaaaa",
+            "key": "aaaaaaa",
             "value": "a7",
         },
         {
-            "key": "aaaaaaaaa",
+            "key": "aaaaaaaa",
             "value": "a8",
         },
         {
-            "key": "aaaaaaaaaa",
+            "key": "aaaaaaaaa",
             "value": "a9",
         },
         {
-            "key": "aaaaaaaaaa",
+            "key": "aaaaaaaaa",
             "value": "a10",
         },
         {
-            "key": "aaaaaaaaaaa",
+            "key": "aaaaaaaaaa",
             "value": "a11",
         },
         {
-            "key": "aaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaa",
             "value": "a12",
         },
         {
-            "key": "aaaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaaa",
             "value": "a13",
         },
         {
-            "key": "aaaaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaaaa",
             "value": "a14",
         },
         {
-            "key": "aaaaaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaaaaa",
             "value": "a15",
         },
         {
-            "key": "aaaaaaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaaaaaa",
             "value": "a16",
         },
         {
-            "key": "aaaaaaaaaaaaaaaaaa",
+            "key": "aaaaaaaaaaaaaaaaa",
             "value": "a17",
+        },
+        {
+            "key": "aaaaaaaaaaaaaaaaaa",
+            "value": "a18",
         },
         {
             "key": "s",
@@ -106,6 +110,10 @@ const mock = async () => {
             "key": "l",
             "value": "ll",
         },
+        {
+            "key": "z1",
+            "value": "z2",
+        },
     ];
 
     // 💡 使用 for...of 才能真正让 await 按顺序执行
@@ -113,10 +121,10 @@ const mock = async () => {
         try {
             console.log(item);
             await upsert(item.key, item.value);
-            toast.success("操作成功", {
-                description: `已成功插入 ${item.key}`,
-                position: "bottom-right", // 定位在右下角
-            });
+            // toast.success("操作成功", {
+            //     description: `已成功插入 ${item.key}`,
+            //     position: "bottom-right", // 定位在右下角
+            // });
         } catch (e) {
             // 🛑 第一次报错就在这里捕获
             // console.error("遇到错误，停止后续操作:", e);

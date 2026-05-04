@@ -321,7 +321,7 @@ function KVAdminPage() {
                             <input value={queryKey} onChange={(e) => setQueryKey(e.target.value)} placeholder="输入查询 Key" className="flex-1 bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-teal-500/50" />
                             <button onClick={handleGetSingle} className="px-8 py-3 bg-teal-600 rounded-xl hover:bg-teal-500 transition-all font-bold">查询</button>
                         </div>
-                        {merkleStatus && <p className={`mt-4 px-3 py-2 rounded-lg text-sm font-medium ${merkleStatus.includes("通过") ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>{merkleStatus}</p>}
+                        {/* {merkleStatus && <p className={`mt-4 px-3 py-2 rounded-lg text-sm font-medium ${merkleStatus.includes("通过") ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>{merkleStatus}</p>} */}
                     </div>
                     <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl border border-slate-700/50 shadow-lg">
                         <h2 className="text-lg font-bold mb-6 text-violet-300">📃 范围扫描</h2>

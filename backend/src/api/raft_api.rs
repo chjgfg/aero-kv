@@ -10,17 +10,11 @@ use openraft::{BasicNode, error::{CheckIsLeaderError, RaftError}};
 use serde_json::json;
 
 use crate::{
-    AppState,
-    api::{
+    AppState, api::{
         auth_api::{AuthQuery, AuthRequest},
         fee_api::FeeRequest,
         kv_api::{KVQuery, KVRequest},
-    },
-    auth::{self, types::Action}, block_chain,
-    constants::VALUE_SEEDS,
-    fee,
-    raft::types::{KvOp, NodeId, RaftConfig},
-    utils::{self},
+    }, auth::{self, types::Action}, block_chain, constants::VALUE_SEEDS, core::validator::{check_key, check_value}, fee, raft::types::{KvOp, NodeId, RaftConfig}, utils::{self}
 };
 
 pub async fn auth_middleware(
@@ -172,6 +166,13 @@ pub async fn raft_upsert(
         // 🌟 在这里必须显式返回一个 Response
         return (StatusCode::FORBIDDEN, "Permission denied").into_response();
     };
+
+    if !check_key(req.key.clone().as_str()) {
+        return (StatusCode::BAD_REQUEST, "key too long or empty").into_response();
+    }
+    if !check_value(req.value.clone().as_str()) {
+        return (StatusCode::BAD_REQUEST, "value too long or empty").into_response();
+    }
     info!("upsert key: {}, value: {}", req.key, req.value);
     let chain = state.chain.clone();
     let k = req.key.clone().into_bytes();
@@ -236,6 +237,9 @@ pub async fn raft_delete(
         // 🌟 在这里必须显式返回一个 Response
         return (StatusCode::FORBIDDEN, "Permission denied").into_response();
     };
+    if !check_key(req.key.clone().as_str()) {
+        return (StatusCode::BAD_REQUEST, "key too long or empty").into_response();
+    }
     info!("delete key: {}", req.key);
     // 1. 构造 Raft 删除提案[cite: 1]
     let op = KvOp::Delete {

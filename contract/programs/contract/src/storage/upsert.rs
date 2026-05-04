@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use crate::{
     auth::structs::AuthConfig,
     constants::{
-        AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_VALUE_LEN, VALUE_SEEDS
+        AUTH_SEEDS, COUNTER_SEEDS, FEE_SEEDS, MAX_KEY_LEN, MAX_KEY_LENGTH, MAX_VALUE_LEN, MAX_VALUE_LENGTH, VALUE_SEEDS
     },
     error::Error,
     fee::FeeConfig,
@@ -49,7 +49,8 @@ pub struct Upsert<'info> {
 pub fn upsert(ctx: Context<Upsert>, key: Vec<u8>, value: Vec<u8>) -> Result<()> {
     msg!("contract upsert key: {:?}, value: {:?}", key, value);
     msg!("contract upsert value pda: {:?}", ctx.accounts.value_account.key());
-    
+    require!(key.len() <= MAX_KEY_LENGTH, Error::KeyTooLong);
+    require!(value.len() <= MAX_VALUE_LENGTH, Error::ValueTooLong);
     // 权限控制
     require!(!ctx.accounts.auth_config.paused, Error::Paused);
 

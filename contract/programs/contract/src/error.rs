@@ -23,5 +23,7 @@ pub enum Error {
     #[msg("Index mismatch")]
     IndexMismatch,
     #[msg("Unauthorized access")]
-    UnauthorizedAccess
+    UnauthorizedAccess,
+    #[msg("Value too long")]
+    ValueTooLong,
 }

@@ -28,6 +28,8 @@ pub enum Error {
     UserDoesNotExistError,
     PermissionDoesNotExistError,
     UserLogout,
+    KeyTooLong,
+    ValueTooLong,
 }
 
 impl Display for Error {
@@ -54,6 +56,8 @@ impl Display for Error {
             Error::UserDoesNotExistError => write!(f, "用户不存在"),
             Error::PermissionDoesNotExistError => write!(f, "权限不存在"),
             Error::UserLogout => write!(f, "用户未登录"),
+            Error::KeyTooLong => write!(f, "key 太大了"),
+            Error::ValueTooLong => write!(f, "value 太大了"),
         }
     }
 }

@@ -42,6 +42,7 @@ const initAuth = async () => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -83,6 +84,7 @@ const setPause = async (paused: boolean) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -116,6 +118,7 @@ const login = async (pubkey: string) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -150,6 +153,7 @@ const logout = async () => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -183,6 +187,7 @@ const grant = async (pubkey: string, selectedActions: Action[]) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -215,6 +220,7 @@ const revoke = async (pubkey: string,) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -243,6 +249,7 @@ const admin_page = async (page: number, limit: number) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -271,6 +278,7 @@ const admin_get = async (key: string, limit: number) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -299,6 +307,7 @@ const initFee = async () => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -335,6 +344,7 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -363,6 +373,7 @@ const initStorage = async () => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -390,6 +401,7 @@ const initCounter = async () => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -463,6 +475,7 @@ const deleted = async (key: string) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -499,6 +512,7 @@ const gets = async (key: string) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 };
 
@@ -539,6 +553,7 @@ const scan = async (key: string, limit: number) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 
@@ -577,6 +592,7 @@ const page = async (page: number, limit: number) => {
             icon: 'error',
             confirmButtonText: '知道了'
         });
+        throw err;
     }
 }
 

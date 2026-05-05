@@ -3,6 +3,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Swal from 'sweetalert2';
+import { toast } from "sonner";
 import {
     health,
     initAuth,
@@ -30,7 +32,7 @@ type TableItem = {
 
 function KVAdminPage() {
     const router = useRouter();
-    
+
     // --- 状态逻辑 (完全不动) ---
     const [initResult, setInitResult] = useState("");
     const [loadingInit, setLoadingInit] = useState(false);
@@ -82,6 +84,12 @@ function KVAdminPage() {
             setInitResult((p) => p + "✅ 总数据初始化完成\n");
         } catch (e: any) {
             setInitResult((p) => p + `❌ 初始化异常：${e.message}\n`);
+            Swal.fire({
+                title: '初始化出错',
+                text: `${e.message}`,
+                icon: 'error',
+                confirmButtonText: '知道了'
+            });
         } finally {
             setLoadingInit(false);
         }
@@ -220,13 +228,13 @@ function KVAdminPage() {
         // 1. 清理所有本地存储的登录信息
         await logout();
         // 2. 跳转回登录页面
-        router.replace("/login"); 
+        router.replace("/login");
     };
 
     return (
         <div className="min-h-screen bg-[#0f172a] text-slate-200 p-8">
             <div className="max-w-7xl mx-auto space-y-8">
-                
+
                 {/* Header 区域 */}
                 <header className="flex justify-between items-center bg-slate-800/40 backdrop-blur-md p-6 rounded-2xl border border-slate-700/50 shadow-xl">
                     <div>
@@ -237,15 +245,6 @@ function KVAdminPage() {
                     </div>
                     {/* 🌟 新增：权限管理按钮 */}
                     <div className="flex gap-3">
-                        {/* 权限管理按钮 (仅管理员可见) */}
-                        {localStorage.getItem("is_admin") === "true" && (
-                            <button
-                                onClick={() => router.push("/admin")}
-                                className="px-6 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 rounded-xl hover:bg-indigo-600/40 transition-all text-sm font-bold flex items-center gap-2"
-                            >
-                                🛡️ 权限管理
-                            </button>
-                        )}
                         {/* 🌟 新增：费用配置按钮 (仅管理员可见) */}
                         {localStorage.getItem("is_admin") === "true" && (
                             <button
@@ -255,7 +254,15 @@ function KVAdminPage() {
                                 💰 费用配置
                             </button>
                         )}
-
+                        {/* 权限管理按钮 (仅管理员可见) */}
+                        {localStorage.getItem("is_admin") === "true" && (
+                            <button
+                                onClick={() => router.push("/admin")}
+                                className="px-6 py-2 bg-indigo-600/20 text-indigo-400 border border-indigo-600/30 rounded-xl hover:bg-indigo-600/40 transition-all text-sm font-bold flex items-center gap-2"
+                            >
+                                🛡️ 权限管理
+                            </button>
+                        )}
                         {/* 🌟 登出按钮 */}
                         <button
                             onClick={handleLogout}
@@ -338,7 +345,7 @@ function KVAdminPage() {
                                     }
                                 }}
                                 placeholder="限制条数"
-                                className="bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" 
+                                className="bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-violet-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             />
                         </div>
                         <button onClick={handleScan} className="w-full mt-4 py-3 bg-violet-600 rounded-xl hover:bg-violet-500 transition-all font-bold">开始扫描任务</button>
@@ -373,7 +380,7 @@ function KVAdminPage() {
                                             <td className="px-8 py-4 font-mono text-sky-400">{item.key}</td>
                                             <td className="px-8 py-4 font-mono text-slate-300">{item.value}</td>
                                             <td className="px-8 py-4 text-center">
-                                                <button 
+                                                <button
                                                     onClick={() => {
                                                         const hash = resJson.key_hashes?.[idx];
                                                         const lIdx = resJson.leaf_indices?.[idx];
@@ -409,7 +416,7 @@ function KVAdminPage() {
                 </details>
             </div>
 
-            
+
             {/* 🌟 弹窗组件 */}
             <FeeSettings isOpen={showFeePanel} onClose={() => setShowFeePanel(false)} />
         </div>

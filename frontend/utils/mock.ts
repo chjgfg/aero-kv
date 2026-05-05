@@ -139,7 +139,7 @@ const mock = async () => {
     }
     Swal.fire({
         title: '写入完成',
-        text: `已成功插入 ${data.length}条数据, 请刷新页面`,
+        text: `已成功插入 ${data.length}条数据, 请手动刷新全表`,
         icon: 'success', // 核心修改：图标改为 success
         confirmButtonText: '太棒了'
     });

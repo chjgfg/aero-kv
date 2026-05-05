@@ -78,7 +78,7 @@ export default function FeeSettings({ isOpen, onClose }: FeeSettingsProps) {
                         <button
                             onClick={() => {
                                 onClose(); 
-                                setFees({ base_fee: 0, fee_per_byte: 0, scan_fee_per_item: 0 });
+                                // setFees({ base_fee: 0, fee_per_byte: 0, scan_fee_per_item: 0 });
                                 setLoading(false);
                             }}
                             className="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-all"

@@ -10,7 +10,6 @@ pub struct Config {
     pub payer_keypair: String,
     pub rpc_url: String,
     pub program_id: String,
-    pub server_port: String,
     pub treasury: String,
 }
 
@@ -26,9 +25,6 @@ impl Config {
         let payer_keypair = env::var("PAYER_KEYPAIR")
             .map_err(|e| Error::PayerKeypairError(format!("Payer Keypair 错误: {}", e)))?;
         // info!("payer_keypair: {}", payer_keypair);
-        let server_port = env::var("SERVER_PORT")
-        .map_err(|e| Error::ServerPortError(format!("Srver Port 错误: {}", e)))?;
-        // info!("payer_keypair: {}", payer_keypair);
         let treasury = env::var("TREASURY")
             .map_err(|e| Error::TreasuryError(format!("treasury 错误: {}", e)))?;
 
@@ -36,7 +32,6 @@ impl Config {
             rpc_url,
             program_id,
             payer_keypair,
-            server_port: server_port,
             treasury,
         })
     }

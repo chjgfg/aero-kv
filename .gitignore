@@ -40,8 +40,6 @@
 /frontend/*.tsbuildinfo
 /frontend/next-env.d.ts
 
-docs
-
 /backend/target
 /backend/Cargo.lock
 /backend/logs/**

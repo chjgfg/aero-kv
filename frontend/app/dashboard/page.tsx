@@ -82,6 +82,12 @@ function KVAdminPage() {
             setInitResult((p) => p + "✅ 存储初始化完成\n");
             await initCounter();
             setInitResult((p) => p + "✅ 总数据初始化完成\n");
+            Swal.fire({
+                title: '初始化完成',
+                text: `已全部初始化完成, 请设置操作合约的费用后再进行数据管理`,
+                icon: 'success',
+                confirmButtonText: '知道了'
+            });
         } catch (e: any) {
             setInitResult((p) => p + `❌ 初始化异常：${e.message}\n`);
             Swal.fire({

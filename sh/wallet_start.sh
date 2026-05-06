@@ -6,10 +6,10 @@ mkdir -p ../test_wallets && cd ../test_wallets
 # 2. 清理旧的记录文件
 rm -f pubkeys.txt
 
-echo "开始批量生成 25 个测试钱包并申请空投..."
+echo "开始批量生成 5 个测试钱包并申请空投..."
 
 # 3. 批量生成钱包、提取公钥并申请空投
-for i in {1..25}; do
+for i in {1..5}; do
     # 生成钱包文件
     solana-keygen new --no-passphrase -so "wallet_$i.json" > /dev/null
     

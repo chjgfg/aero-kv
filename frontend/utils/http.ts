@@ -330,7 +330,10 @@ const setFee = async (base_fee: number, fee_per_byte: number, scan_fee_per_item:
 
         // 🌟 使用封装好的方法：如果报错会直接抛出并进入 catch
         await handleResponseError(res);
-
+        toast.success("操作成功", {
+            description: `已成功设置操作合约的费用`,
+            position: "bottom-right", // 定位在右下角
+        });
         const data = await res.json();
         console.log(res);
         console.log(data);

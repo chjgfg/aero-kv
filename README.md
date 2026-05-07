@@ -5,6 +5,11 @@
 
 ---
 
+## 🎬 Demo Video
+[Demo Video](https://youtu.be/CsDJc9LSp2w)
+
+---
+
 ## 🎯 Competition Positioning
 This project falls under the category of **core Solana Web3 infrastructure projects**, distinct from ordinary business DApps. It focuses on the Solana ecosystem infrastructure track, addressing the industry pain point of the lack of a structured KV storage middleware with "on-chain verifiability + off-chain high performance" in the current ecosystem. With "technological innovation, engineering implementation, and ecological reuse" as the core, the project builds a full-stack closed-loop production-grade storage solution, aligning with the competition's three core evaluation criteria of technical depth, implementation feasibility, and ecological value, helping to highlight differentiated advantages in the competition.
 
